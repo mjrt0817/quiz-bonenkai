@@ -80,7 +80,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
       <div className="h-full bg-indigo-600 flex flex-col items-center justify-center p-6 relative">
         <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-black text-slate-800 mb-2">クイズ大会</h1>
+            <h1 className="text-3xl font-black text-slate-800 mb-2">{state.quizTitle || 'クイズ大会'}</h1>
             <p className="text-slate-500">名前を入力して参加しよう！</p>
             <p className="text-xs text-slate-400 mt-2">※同じ名前で再開できます</p>
           </div>
@@ -258,7 +258,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
      }
 
      if (!showMyResult) {
-         // Suspense Screen for Top Rankers
+         // Suspense Screen for Top Rankers (Generic message now)
          return (
              <div className="h-full bg-slate-900 flex flex-col items-center justify-center p-8 text-white text-center relative overflow-hidden">
                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
@@ -267,10 +267,9 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
                         <Sparkles size={40} className="text-white" />
                      </div>
                      <h2 className="text-3xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-yellow-500">
-                         TOP RANKER!
+                         結果発表中...
                      </h2>
                      <p className="text-xl text-indigo-200 mb-8">
-                         あなたはTOP3に入りました！<br/>
                          スクリーンでの発表をお待ちください...
                      </p>
                      <div className="px-6 py-2 bg-white/10 rounded-full backdrop-blur-md border border-white/20">
