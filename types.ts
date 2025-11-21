@@ -1,0 +1,47 @@
+export enum GameState {
+  SETUP = 'SETUP',
+  LOBBY = 'LOBBY',
+  PLAYING_QUESTION = 'PLAYING_QUESTION',
+  PLAYING_RESULT = 'PLAYING_RESULT', // Showing correct answer for current question
+  FINAL_RESULT = 'FINAL_RESULT',
+}
+
+export interface QuizQuestion {
+  id: string;
+  text: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface Player {
+  id: string;
+  name: string;
+  score: number;
+  lastAnswerIndex: number | null; // -1 for no answer, 0-3 for index
+  lastAnswerTime: number; // For tie-breaking
+}
+
+export interface BroadcastMessage {
+  type: 'SYNC_STATE' | 'PLAYER_JOIN' | 'PLAYER_ANSWER' | 'ADMIN_ACTION';
+  payload?: any;
+}
+
+export interface HostState {
+  gameState: GameState;
+  currentQuestionIndex: number;
+  questions: QuizQuestion[];
+  players: Player[];
+  roomCode: string;
+  timeLimit: number; // in seconds
+  questionStartTime: number | null; // Timestamp when question started
+}
+
+export const COLORS = [
+  'bg-blue-500 hover:bg-blue-600', // Option 0
+  'bg-red-500 hover:bg-red-600',   // Option 1
+  'bg-green-500 hover:bg-green-600', // Option 2
+  'bg-yellow-500 hover:bg-yellow-600' // Option 3
+];
+
+export const BTN_LABELS = ['A', 'B', 'C', 'D'];
