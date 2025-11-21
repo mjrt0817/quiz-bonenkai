@@ -15,6 +15,7 @@ const INITIAL_HOST_STATE: HostState = {
   questionStartTime: null,
   rankingRevealStage: 0,
   hideBelowTop3: false,
+  quizTitle: 'クイズ大会',
 };
 
 export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
