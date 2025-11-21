@@ -101,6 +101,7 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     hostState.players.forEach(p => {
         updates[`rooms/${ROOM_ID}/players/${p.id}/score`] = 0;
         updates[`rooms/${ROOM_ID}/players/${p.id}/lastAnswerIndex`] = null;
+        updates[`rooms/${ROOM_ID}/players/${p.id}/totalResponseTime`] = 0;
     });
     if (Object.keys(updates).length > 0) {
         await update(ref(db), updates);
@@ -112,10 +113,20 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     if (!hostState.questions || !hostState.questions[hostState.currentQuestionIndex]) return;
 
     const currentQ = hostState.questions[hostState.currentQuestionIndex];
+    const questionStartTime = hostState.questionStartTime;
     const updates: any = {};
     
     hostState.players.forEach(p => {
-      // Calculate score only if correct
+      // Calculate Time Difference (Tie Breaker)
+      // We accumulate time taken for ALL answers (or you could restrict to only correct ones)
+      // Here we accumulate time for any answer submitted to break ties based on "speed of participation"
+      if (p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined && p.lastAnswerTime && questionStartTime) {
+          const timeTaken = Math.max(0, p.lastAnswerTime - questionStartTime);
+          const currentTotal = p.totalResponseTime || 0;
+          updates[`rooms/${ROOM_ID}/players/${p.id}/totalResponseTime`] = currentTotal + timeTaken;
+      }
+
+      // Calculate Score
       if (p.lastAnswerIndex === currentQ.correctIndex) {
          const newScore = (p.score || 0) + 10; // 10 points per correct answer
          updates[`rooms/${ROOM_ID}/players/${p.id}/score`] = newScore;
@@ -125,7 +136,7 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     if (Object.keys(updates).length > 0) {
       await update(ref(db), updates);
     }
-  }, [role, hostState.players, hostState.questions, hostState.currentQuestionIndex]);
+  }, [role, hostState.players, hostState.questions, hostState.currentQuestionIndex, hostState.questionStartTime]);
 
   const kickPlayer = useCallback(async (targetPlayerId: string) => {
     if (role !== 'HOST' && role !== 'ADMIN') return;
@@ -155,18 +166,15 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     let targetId = playerId;
 
     if (existingPlayer) {
-      // RECOVERY LOGIC: Name exists, so we assume it's the same person reconnecting
-      // We overwrite the local session ID with the existing one found in DB
+      // RECOVERY LOGIC
       targetId = existingPlayer.id;
       setPlayerId(targetId);
       localStorage.setItem('quiz_player_id', targetId);
       
-      // Mark as online
       const playerRef = ref(db, `rooms/${ROOM_ID}/players/${targetId}`);
       update(playerRef, { isOnline: true });
     } else {
       // NEW PLAYER
-      // If we have a leftover ID but that name isn't in DB anymore (maybe reset?), keep ID but set new name
       if (!targetId) {
         targetId = `p-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
         setPlayerId(targetId);
@@ -179,6 +187,7 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
         score: 0,
         lastAnswerIndex: null,
         lastAnswerTime: 0,
+        totalResponseTime: 0,
         isOnline: true
       };
       const playerRef = ref(db, `rooms/${ROOM_ID}/players/${targetId}`);
@@ -193,6 +202,7 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     const answerRef = ref(db, `rooms/${ROOM_ID}/players/${playerId}/lastAnswerIndex`);
     const timeRef = ref(db, `rooms/${ROOM_ID}/players/${playerId}/lastAnswerTime`);
     
+    // Player just sends their timestamp. The host will calculate the duration relative to question start.
     set(answerRef, index);
     set(timeRef, Date.now());
   }, [role, playerId]);
