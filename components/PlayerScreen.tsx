@@ -156,17 +156,17 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
            />
         </div>
 
-        <div className="flex-1 flex flex-col justify-center gap-4">
+        <div className="flex-1 grid grid-cols-2 gap-4 content-center">
            {state.questions[state.currentQuestionIndex]?.options.map((opt, idx) => (
              <button
                key={idx}
                onClick={() => onAnswer(idx)}
-               className={`${COLORS[idx]} w-full h-24 rounded-2xl shadow-lg flex items-center px-6 gap-4 active:scale-95 transition-transform`}
+               className={`${COLORS[idx]} w-full min-h-[140px] rounded-2xl shadow-lg flex flex-col items-center justify-center p-4 gap-2 active:scale-95 transition-transform`}
              >
                <div className="w-10 h-10 bg-black/20 rounded-full flex items-center justify-center font-bold text-white text-xl">
                  {BTN_LABELS[idx]}
                </div>
-               <span className="text-white font-bold text-xl text-left leading-tight line-clamp-2">{opt}</span>
+               <span className="text-white font-bold text-lg text-center leading-tight line-clamp-3 break-words w-full">{opt}</span>
              </button>
            ))}
         </div>
