@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
-import { Users, Trophy, CheckCircle, Sparkles, QrCode, Clock, Monitor, Loader2, Medal } from 'lucide-react';
+import { Users, Trophy, CheckCircle, Sparkles, QrCode, Clock, Monitor, Loader2, Medal, AlertTriangle } from 'lucide-react';
 
 interface HostScreenProps {
   state: HostState;
@@ -153,11 +153,24 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
       {/* Top Bar */}
       <header className="bg-slate-900 p-6 flex justify-between items-center border-b border-slate-800 shadow-lg relative z-20">
         <div className="flex items-center gap-6">
-          <div className={`px-4 py-2 rounded-lg border flex items-center gap-3 ${isFinalQuestion && state.gameState !== GameState.FINAL_RESULT ? 'bg-red-600 border-red-500' : 'bg-slate-800 border-slate-700'}`}>
-             <span className="text-white/80 text-sm font-bold block uppercase text-xs">
-                {isFinalQuestion && state.gameState !== GameState.FINAL_RESULT ? 'FINAL QUESTION' : 'Question'}
+          <div className={`px-6 py-3 rounded-xl border-2 flex items-center gap-3 shadow-lg transition-all duration-500 ${
+            isFinalQuestion && state.gameState !== GameState.FINAL_RESULT 
+              ? 'bg-red-600 border-red-500 animate-pulse shadow-red-900/50' 
+              : 'bg-slate-800 border-slate-700'
+          }`}>
+             <span className={`font-black block uppercase ${isFinalQuestion && state.gameState !== GameState.FINAL_RESULT ? 'text-2xl text-white tracking-widest' : 'text-white/80 text-sm'}`}>
+                {isFinalQuestion && state.gameState !== GameState.FINAL_RESULT ? (
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={28} className="animate-bounce"/>
+                    最終問題
+                  </div>
+                ) : 'Question'}
              </span>
-             <span className="text-2xl font-black font-mono text-white">{state.currentQuestionIndex + 1}<span className="text-white/50 text-lg">/{state.questions.length}</span></span>
+             {(!isFinalQuestion || state.gameState === GameState.FINAL_RESULT) && (
+               <span className="text-3xl font-black font-mono text-white">
+                 {state.currentQuestionIndex + 1}<span className="text-white/50 text-lg">/{state.questions.length}</span>
+               </span>
+             )}
           </div>
         </div>
         
@@ -181,7 +194,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
       {state.gameState === GameState.PLAYING_QUESTION && (
         <div className="h-3 bg-slate-900 w-full">
            <div 
-             className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all ease-linear duration-100"
+             className={`h-full transition-all ease-linear duration-100 ${timeLeft < 5 ? 'bg-red-500' : 'bg-gradient-to-r from-indigo-500 to-purple-500'}`}
              style={{ width: `${(timeLeft / state.timeLimit) * 100}%` }}
            />
         </div>
