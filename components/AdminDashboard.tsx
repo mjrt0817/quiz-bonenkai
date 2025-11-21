@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
   updateState: (updater: (prev: HostState) => HostState) => void;
   resetPlayerAnswers: () => Promise<void>;
   resetPlayerScores: () => Promise<void>;
+  calculateAndSaveScores: () => Promise<void>; // Added this
   kickPlayer: (id: string) => Promise<void>;
   resetAllPlayers: () => Promise<void>;
   onBack: () => void;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  state, updateState, resetPlayerAnswers, resetPlayerScores, kickPlayer, resetAllPlayers, onBack 
+  state, updateState, resetPlayerAnswers, resetPlayerScores, calculateAndSaveScores, kickPlayer, resetAllPlayers, onBack 
 }) => {
   const [csvUrl, setCsvUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +33,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         ...prev,
         questions,
         gameState: GameState.LOBBY,
-        currentQuestionIndex: 0
+        currentQuestionIndex: 0,
+        rankingRevealStage: 0
       }));
       setStatusMsg(`読み込み成功！ ${questions.length}問セットされました。`);
     } catch (err: any) {
@@ -49,11 +51,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       currentQuestionIndex: 0,
       gameState: GameState.PLAYING_QUESTION,
       questionStartTime: Date.now(),
-      timeLimit: 20 
+      timeLimit: 20,
+      rankingRevealStage: 0
     }));
   };
 
-  const showResults = () => {
+  const showResults = async () => {
+    // 1. Calculate scores first
+    await calculateAndSaveScores();
+    
+    // 2. Then change state to show results
     updateState(prev => ({
       ...prev,
       gameState: GameState.PLAYING_RESULT,
@@ -66,7 +73,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     updateState(prev => {
       const nextIndex = prev.currentQuestionIndex + 1;
       if (nextIndex >= prev.questions.length) {
-        return { ...prev, gameState: GameState.FINAL_RESULT };
+        return { 
+            ...prev, 
+            gameState: GameState.FINAL_RESULT,
+            rankingRevealStage: 0 // Start with stage 0 (4th place and below)
+        };
       }
       return {
         ...prev,
@@ -77,11 +88,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   };
 
+  const nextRankingStage = () => {
+      updateState(prev => {
+          const nextStage = prev.rankingRevealStage + 1;
+          return { ...prev, rankingRevealStage: nextStage };
+      });
+  };
+
   const resetGame = () => {
     updateState(prev => ({
       ...prev,
       gameState: GameState.SETUP,
       questions: [],
+      rankingRevealStage: 0
     }));
     setStatusMsg('ゲームをリセットしました');
   };
@@ -92,6 +111,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const currentQ = state.questions && state.questions[state.currentQuestionIndex] 
     ? state.questions[state.currentQuestionIndex]
     : { text: "", options: [] };
+
+  const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
@@ -109,6 +130,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {/* LEFT COLUMN: CONTROLS */}
         <div className="lg:col-span-1 space-y-6">
           
+          {/* Qr Code for Admin Ref */}
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center">
+             <p className="text-xs text-slate-500 mb-2">プレイヤー参加用URL</p>
+             <div className="bg-slate-100 p-2 rounded text-xs font-mono truncate select-all">
+               {typeof window !== 'undefined' ? window.location.href.replace('role=admin', 'role=player') : ''}
+             </div>
+          </div>
+
           {/* 1. Setup Panel */}
           <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
             <h2 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-700"><RefreshCw size={20}/> クイズ読み込み</h2>
@@ -147,10 +176,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <h2 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-700"><Play size={20}/> 進行コントロール</h2>
               
               <div className="space-y-4">
-                <div className="text-center p-4 bg-slate-50 rounded mb-4">
+                <div className="text-center p-4 bg-slate-50 rounded mb-4 relative overflow-hidden">
                    <div className="text-xs text-slate-500 uppercase">現在の問題</div>
                    <div className="text-xl font-bold text-slate-800">第 {state.currentQuestionIndex + 1} 問</div>
                    <div className="text-sm text-slate-600 truncate">{currentQ.text}</div>
+                   
+                   {isFinalQuestion && state.gameState !== GameState.FINAL_RESULT && (
+                     <div className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold px-2 py-1">FINAL</div>
+                   )}
                 </div>
 
                 {state.gameState === GameState.LOBBY && (
@@ -166,14 +199,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 )}
 
                 {state.gameState === GameState.PLAYING_RESULT && (
-                  <button onClick={nextQuestion} className="w-full bg-slate-800 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-slate-900 flex justify-center items-center gap-2">
-                     次の問題へ <ChevronRight/>
+                  <button onClick={nextQuestion} className={`w-full text-white py-4 rounded-lg font-bold text-xl shadow flex justify-center items-center gap-2 ${isFinalQuestion ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-800 hover:bg-slate-900'}`}>
+                     {isFinalQuestion ? '最終結果へ' : '次の問題へ'} <ChevronRight/>
                   </button>
                 )}
 
                 {state.gameState === GameState.FINAL_RESULT && (
-                  <div className="text-center text-yellow-600 font-bold text-lg">
-                    全問終了！結果発表中
+                  <div className="space-y-2">
+                    <div className="text-center text-yellow-600 font-bold text-lg mb-2">
+                      最終結果発表中
+                    </div>
+                    <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-center mb-2">
+                        Current Stage: 
+                        <span className="font-bold ml-2">
+                            {state.rankingRevealStage === 0 ? '4位以下' : 
+                             state.rankingRevealStage === 1 ? '3位発表' : 
+                             state.rankingRevealStage === 2 ? '2位発表' : '1位発表'}
+                        </span>
+                    </div>
+
+                    {state.rankingRevealStage < 3 ? (
+                        <button onClick={nextRankingStage} className="w-full bg-yellow-500 text-white py-3 rounded shadow hover:bg-yellow-600 font-bold flex items-center justify-center gap-2">
+                            <Medal size={20}/> 
+                            {state.rankingRevealStage === 0 ? '3位を発表' : 
+                             state.rankingRevealStage === 1 ? '2位を発表' : '優勝者を発表'}
+                        </button>
+                    ) : (
+                        <button disabled className="w-full bg-slate-300 text-slate-500 py-3 rounded font-bold">
+                            発表終了
+                        </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -182,7 +237,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         {/* RIGHT COLUMN: PLAYER MANAGEMENT */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-[80vh]">
            <div className="p-4 border-b border-slate-200 flex justify-between items-center">
               <h2 className="font-bold text-lg flex items-center gap-2 text-slate-700">
                 <Users size={20}/> 参加者管理 ({state.players.length}名)
@@ -207,7 +262,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
            <div className="flex-1 overflow-auto p-0">
              <table className="w-full text-left border-collapse">
-               <thead className="bg-slate-50 sticky top-0 text-xs uppercase text-slate-500">
+               <thead className="bg-slate-50 sticky top-0 text-xs uppercase text-slate-500 z-10">
                  <tr>
                    <th className="p-3">名前</th>
                    <th className="p-3">スコア</th>
@@ -219,22 +274,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  {state.players.length === 0 ? (
                    <tr><td colSpan={4} className="p-8 text-center text-slate-400">参加者はまだいません</td></tr>
                  ) : (
-                   state.players.map(player => {
+                   // Sort by score desc for Admin view
+                   [...state.players].sort((a, b) => b.score - a.score).map((player, index) => {
                      const hasAns = player.lastAnswerIndex !== null && player.lastAnswerIndex !== undefined;
+                     // Check correctness if needed (only during result)
+                     const isCorrect = state.gameState === GameState.PLAYING_RESULT && player.lastAnswerIndex === state.questions[state.currentQuestionIndex].correctIndex;
+
                      return (
                        <tr key={player.id} className="hover:bg-slate-50 group">
                          <td className="p-3 font-bold text-slate-800">
                            <div className="flex items-center gap-2">
+                             <span className="w-5 text-slate-400 text-xs">{index + 1}</span>
                              <div className={`w-2 h-2 rounded-full ${player.isOnline !== false ? 'bg-green-500' : 'bg-gray-300'}`}></div>
                              {player.name}
                            </div>
                          </td>
-                         <td className="p-3 font-mono">{player.score}</td>
+                         <td className="p-3 font-mono font-bold text-indigo-600">{player.score}</td>
                          <td className="p-3">
                            {hasAns ? (
-                             <span className="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-bold">
-                               回答済み
-                             </span>
+                             state.gameState === GameState.PLAYING_RESULT ? (
+                                 <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                     {isCorrect ? '正解' : '不正解'}
+                                 </span>
+                             ) : (
+                                 <span className="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-bold">
+                                     回答済み
+                                 </span>
+                             )
                            ) : (
                              <span className="text-slate-400 text-xs">-</span>
                            )}
