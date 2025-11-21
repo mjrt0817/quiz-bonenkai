@@ -88,7 +88,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // --- Stats Calculation ---
   const answeredCount = state.players.filter(p => p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
-  const currentQ = state.questions[state.currentQuestionIndex];
+  // Safe access
+  const currentQ = state.questions && state.questions[state.currentQuestionIndex] 
+    ? state.questions[state.currentQuestionIndex]
+    : { text: "", options: [] };
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
@@ -147,7 +150,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="text-center p-4 bg-slate-50 rounded mb-4">
                    <div className="text-xs text-slate-500 uppercase">現在の問題</div>
                    <div className="text-xl font-bold text-slate-800">第 {state.currentQuestionIndex + 1} 問</div>
-                   <div className="text-sm text-slate-600 truncate">{currentQ?.text}</div>
+                   <div className="text-sm text-slate-600 truncate">{currentQ.text}</div>
                 </div>
 
                 {state.gameState === GameState.LOBBY && (
