@@ -79,8 +79,16 @@ const App: React.FC = () => {
 
 // Wrapper components
 const HostApp: React.FC<{onBack: () => void}> = ({ onBack }) => {
-  const { hostState, updateHostState } = useGameCommunication('HOST');
-  return <HostScreen state={hostState} updateState={updateHostState} onBack={onBack} />;
+  const { hostState, updateHostState, resetPlayerAnswers, resetPlayerScores } = useGameCommunication('HOST');
+  return (
+    <HostScreen 
+      state={hostState} 
+      updateState={updateHostState} 
+      onBack={onBack} 
+      resetPlayerAnswers={resetPlayerAnswers}
+      resetPlayerScores={resetPlayerScores}
+    />
+  );
 };
 
 const PlayerApp: React.FC<{onBack: () => void}> = ({ onBack }) => {
