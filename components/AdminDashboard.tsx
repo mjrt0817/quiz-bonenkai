@@ -200,6 +200,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                    )}
                 </div>
 
+                {/* Global Options: Always visible when questions are loaded */}
+                <div className="mb-4">
+                    <button 
+                        onClick={toggleHideBelowTop3}
+                        className={`w-full py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 border transition ${state.hideBelowTop3 ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}
+                    >
+                        {state.hideBelowTop3 ? <EyeOff size={16}/> : <Eye size={16}/>}
+                        {state.hideBelowTop3 ? '最終結果で4位以下を隠す (ON)' : '最終結果で4位以下を表示 (OFF)'}
+                    </button>
+                    <p className="text-[10px] text-slate-400 text-center mt-1">※最終結果発表時の表示設定</p>
+                </div>
+
                 {state.gameState === GameState.LOBBY && (
                   <button onClick={startGame} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700">
                      クイズ開始！
@@ -232,16 +244,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </span>
                     </div>
                     
-                    <div className="flex items-center gap-2 mb-2 p-2 bg-slate-50 rounded border border-slate-200">
-                        <button 
-                            onClick={toggleHideBelowTop3}
-                            className={`flex-1 py-2 px-3 rounded text-xs font-bold flex items-center justify-center gap-2 border transition ${state.hideBelowTop3 ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-300'}`}
-                        >
-                            {state.hideBelowTop3 ? <EyeOff size={14}/> : <Eye size={14}/>}
-                            4位以下を{state.hideBelowTop3 ? '表示する' : '隠す'}
-                        </button>
-                    </div>
-
                     {state.rankingRevealStage < 3 ? (
                         <button onClick={nextRankingStage} className="w-full bg-yellow-500 text-white py-3 rounded shadow hover:bg-yellow-600 font-bold flex items-center justify-center gap-2">
                             <Medal size={20}/> 
