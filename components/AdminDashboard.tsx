@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -27,9 +27,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [state.quizTitle]);
 
   // Optimize player sorting using useMemo to prevent re-calculations on every render
+  // SORT: Score (Desc) -> TotalResponseTime (Asc) -> Name (Asc)
   const sortedPlayers = useMemo(() => {
     return [...state.players].sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
+        // Tie-breaker: Faster total time wins (smaller value)
+        const timeA = a.totalResponseTime || 0;
+        const timeB = b.totalResponseTime || 0;
+        if (timeA !== timeB) return timeA - timeB;
         return a.name.localeCompare(b.name);
     });
   }, [state.players]);
@@ -316,18 +321,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  <tr>
                    <th className="p-3">名前</th>
                    <th className="p-3">スコア</th>
+                   <th className="p-3">合計時間</th>
                    <th className="p-3">現在の回答</th>
                    <th className="p-3 text-right">アクション</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-100 text-sm">
                  {sortedPlayers.length === 0 ? (
-                   <tr><td colSpan={4} className="p-8 text-center text-slate-400">参加者はまだいません</td></tr>
+                   <tr><td colSpan={5} className="p-8 text-center text-slate-400">参加者はまだいません</td></tr>
                  ) : (
                    sortedPlayers.map((player, index) => {
                      const hasAns = player.lastAnswerIndex !== null && player.lastAnswerIndex !== undefined;
                      // Check correctness if needed (only during result)
                      const isCorrect = state.gameState === GameState.PLAYING_RESULT && player.lastAnswerIndex === state.questions[state.currentQuestionIndex].correctIndex;
+                     const totalSec = ((player.totalResponseTime || 0) / 1000).toFixed(1);
 
                      return (
                        <tr key={player.id} className="hover:bg-slate-50 group">
@@ -339,6 +346,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                            </div>
                          </td>
                          <td className="p-3 font-mono font-bold text-indigo-600">{player.score}</td>
+                         <td className="p-3 font-mono text-xs text-slate-500 flex items-center gap-1">
+                            <Clock size={12}/> {totalSec}s
+                         </td>
                          <td className="p-3">
                            {hasAns ? (
                              state.gameState === GameState.PLAYING_RESULT ? (
