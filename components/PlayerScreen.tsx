@@ -215,8 +215,14 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
 
   // --- 5. FINAL RESULT (Staged Reveal) ---
   if (state.gameState === GameState.FINAL_RESULT) {
-     // Calculate Rank
-     const sortedPlayers = [...state.players].sort((a, b) => b.score - a.score);
+     // Calculate Rank: Score Desc -> Time Asc
+     const sortedPlayers = [...state.players].sort((a, b) => {
+         if (b.score !== a.score) return b.score - a.score;
+         const timeA = a.totalResponseTime || 0;
+         const timeB = b.totalResponseTime || 0;
+         return timeA - timeB;
+     });
+     
      const myRankIndex = sortedPlayers.findIndex(p => p.id === playerId);
      const myRank = myRankIndex + 1;
      
