@@ -34,8 +34,11 @@ export const generateQuizQuestions = async (topic: string, count: number = 5): P
       }
     });
 
-    const rawData = response.text;
+    let rawData = response.text;
     if (!rawData) throw new Error("No data returned from Gemini");
+
+    // Sanitize the response to remove potential Markdown code blocks
+    rawData = rawData.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/```$/, "");
 
     const parsedData = JSON.parse(rawData);
     
