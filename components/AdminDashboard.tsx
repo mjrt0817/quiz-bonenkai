@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -42,7 +42,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         questions,
         gameState: GameState.LOBBY,
         currentQuestionIndex: 0,
-        rankingRevealStage: 0
+        rankingRevealStage: 0,
+        hideBelowTop3: false
       }));
       setStatusMsg(`読み込み成功！ ${questions.length}問セットされました。`);
     } catch (err: any) {
@@ -102,13 +103,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           return { ...prev, rankingRevealStage: nextStage };
       });
   };
+  
+  const toggleHideBelowTop3 = () => {
+      updateState(prev => ({ ...prev, hideBelowTop3: !prev.hideBelowTop3 }));
+  };
 
   const resetGame = () => {
     updateState(prev => ({
       ...prev,
       gameState: GameState.SETUP,
       questions: [],
-      rankingRevealStage: 0
+      rankingRevealStage: 0,
+      hideBelowTop3: false
     }));
     setStatusMsg('ゲームをリセットしました');
   };
@@ -213,7 +219,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 )}
 
                 {state.gameState === GameState.FINAL_RESULT && (
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     <div className="text-center text-yellow-600 font-bold text-lg mb-2">
                       最終結果発表中
                     </div>
@@ -224,6 +230,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                              state.rankingRevealStage === 1 ? '3位発表' : 
                              state.rankingRevealStage === 2 ? '2位発表' : '1位発表'}
                         </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mb-2 p-2 bg-slate-50 rounded border border-slate-200">
+                        <button 
+                            onClick={toggleHideBelowTop3}
+                            className={`flex-1 py-2 px-3 rounded text-xs font-bold flex items-center justify-center gap-2 border transition ${state.hideBelowTop3 ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-300'}`}
+                        >
+                            {state.hideBelowTop3 ? <EyeOff size={14}/> : <Eye size={14}/>}
+                            4位以下を{state.hideBelowTop3 ? '表示する' : '隠す'}
+                        </button>
                     </div>
 
                     {state.rankingRevealStage < 3 ? (
