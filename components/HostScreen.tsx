@@ -214,7 +214,14 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
              <div className="w-full grid grid-cols-1 gap-4 justify-items-center">
                {/* Logic for Ranking Reveal Stages */}
                {(() => {
-                   const sorted = [...state.players].sort((a, b) => b.score - a.score);
+                   // Sort: Score Desc -> Time Asc
+                   const sorted = [...state.players].sort((a, b) => {
+                        if (b.score !== a.score) return b.score - a.score;
+                        const timeA = a.totalResponseTime || 0;
+                        const timeB = b.totalResponseTime || 0;
+                        return timeA - timeB;
+                   });
+
                    const first = sorted[0];
                    const second = sorted[1];
                    const third = sorted[2];
