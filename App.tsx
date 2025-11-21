@@ -108,13 +108,19 @@ const HostApp: React.FC<{onBack: () => void}> = ({ onBack }) => {
 };
 
 const AdminApp: React.FC<{onBack: () => void}> = ({ onBack }) => {
-  const { hostState, updateHostState, resetPlayerAnswers, resetPlayerScores, kickPlayer, resetAllPlayers } = useGameCommunication('ADMIN');
+  const { 
+    hostState, updateHostState, resetPlayerAnswers, 
+    resetPlayerScores, calculateAndSaveScores, 
+    kickPlayer, resetAllPlayers 
+  } = useGameCommunication('ADMIN');
+  
   return (
     <AdminDashboard 
       state={hostState} 
       updateState={updateHostState} 
       resetPlayerAnswers={resetPlayerAnswers}
       resetPlayerScores={resetPlayerScores}
+      calculateAndSaveScores={calculateAndSaveScores}
       kickPlayer={kickPlayer}
       resetAllPlayers={resetAllPlayers}
       onBack={onBack}
