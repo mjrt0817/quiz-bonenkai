@@ -1,0 +1,5 @@
+{
+  "name": "AnswerTouch Clone - AI Quiz",
+  "description": "A real-time quiz tournament app where one user hosts and others join via separate tabs. Features AI-generated quizzes powered by Gemini.",
+  "requestFramePermissions": []
+}
