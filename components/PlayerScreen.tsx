@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, Player, BTN_LABELS, COLORS } from '../types';
-import { User, Loader, Check, X, Trophy, LogOut, AlertCircle, Sparkles, Lock, Medal } from 'lucide-react';
+import { User, Loader, Check, X, Trophy, LogOut, AlertCircle, Sparkles, Lock, Medal, AlertTriangle } from 'lucide-react';
 
 interface PlayerScreenProps {
   state: HostState;
@@ -20,6 +20,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
   
   const currentPlayer = state.players.find(p => p.id === playerId);
   const hasAnswered = currentPlayer?.lastAnswerIndex !== null && currentPlayer?.lastAnswerIndex !== undefined;
+  const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
   // Auto-fill name and restore session
   useEffect(() => {
@@ -138,10 +139,19 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
 
     return (
       <div className="h-full bg-slate-900 flex flex-col p-4 pb-8">
+        {/* Final Question Banner */}
+        {isFinalQuestion && (
+          <div className="w-full bg-red-600 text-white text-center font-bold py-3 rounded-xl mb-4 animate-pulse shadow-lg border-2 border-red-400 flex items-center justify-center gap-2">
+            <AlertTriangle size={20}/>
+            ⚠️ 最終問題 ⚠️
+            <AlertTriangle size={20}/>
+          </div>
+        )}
+
         {/* Timer Bar */}
         <div className="w-full h-2 bg-slate-800 rounded-full mb-6 overflow-hidden">
            <div 
-             className="h-full bg-indigo-500 transition-all duration-100 ease-linear"
+             className={`h-full transition-all duration-100 ease-linear ${timeLeft < 5 ? 'bg-red-500' : 'bg-indigo-500'}`}
              style={{ width: `${(timeLeft / state.timeLimit) * 100}%` }}
            />
         </div>
