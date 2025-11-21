@@ -3,19 +3,18 @@ import { GameState, HostState, QuizQuestion, BTN_LABELS, COLORS, Player } from '
 import { generateQuizQuestions } from '../services/geminiService';
 import PlayerScreen from './PlayerScreen';
 import { Loader2, Users, Trophy, Play, ChevronRight, CheckCircle, XCircle, Sparkles, QrCode, ExternalLink, Smartphone, X, Clock, Home } from 'lucide-react';
-import { db } from '../services/firebaseConfig'; // Import db to clear data if needed
+import { db } from '../services/firebaseConfig';
 import { ref, set } from 'firebase/database';
 
 interface HostScreenProps {
   state: HostState;
   updateState: (updater: (prev: HostState) => HostState) => void;
   onBack: () => void;
+  resetPlayerAnswers?: () => Promise<void>;
+  resetPlayerScores?: () => Promise<void>;
 }
 
 // Simulator Component
-// NOTE: In Firebase mode, the simulator can still use local props for display,
-// but ideally it should also act as a real player.
-// However, for "visual check" purposes, passing props is faster and doesn't clutter the DB.
 const SimulatedPlayerInstance: React.FC<{
   hostState: HostState;
   onJoin: (player: Player) => void;
@@ -68,7 +67,7 @@ const PlayerSimulatorWindow: React.FC<PlayerSimulatorWindowProps> = memo(({ host
   </div>
 ));
 
-const HostScreen: React.FC<HostScreenProps> = ({ state, updateState, onBack }) => {
+const HostScreen: React.FC<HostScreenProps> = ({ state, updateState, onBack, resetPlayerAnswers, resetPlayerScores }) => {
   const [topic, setTopic] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -131,7 +130,11 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, updateState, onBack }) =
   };
 
   const startGame = () => {
-    // Reset scores and answers for all players
+    // Clear remote DB scores if function is available
+    if (resetPlayerScores) {
+        resetPlayerScores();
+    }
+
     const resetPlayers = state.players.map(p => ({ ...p, score: 0, lastAnswerIndex: null }));
     
     updateState(prev => ({
@@ -169,12 +172,17 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, updateState, onBack }) =
   }, [updateState]);
 
   const nextQuestion = () => {
+    // Clear remote DB answers for next question
+    if (resetPlayerAnswers) {
+        resetPlayerAnswers();
+    }
+
     updateState(prev => {
       const nextIndex = prev.currentQuestionIndex + 1;
       if (nextIndex >= prev.questions.length) {
         return { ...prev, gameState: GameState.FINAL_RESULT };
       }
-      // Reset answers for next question
+      // Reset answers for next question locally
       const resetPlayers = prev.players.map(p => ({...p, lastAnswerIndex: null}));
       
       return {
@@ -193,18 +201,10 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, updateState, onBack }) =
       gameState: GameState.SETUP,
       questions: [],
       players: [] 
-      // NOTE: In a real app we might want to keep players or kick them.
-      // Here we keep players but reset state.
     }));
-    // Optional: Clear players from DB if you want a fresh start
-    // const roomRef = ref(db, 'rooms/party-room-2024');
-    // set(roomRef, INITIAL_HOST_STATE);
   };
 
   // --- SIMULATOR HANDLERS ---
-  // Since we are now using Firebase, the Host component's "updateState" will sync to Firebase.
-  // The simulator needs to call these same updates.
-  // However, SimulatedPlayerInstance uses `onJoin` and `onAnswer`.
   
   const handleSimJoin = useCallback((player: Player) => {
     // Directly update host state, which syncs to DB
@@ -348,7 +348,12 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, updateState, onBack }) =
                    <QrCode size={80} className="text-slate-900" />
                  )}
                </div>
-               <p className="mt-4 text-center font-bold text-slate-900 text-lg">スキャンして参加</p>
+               <div className="mt-4 text-center">
+                 <p className="font-bold text-slate-900 text-lg">スキャンして参加</p>
+                 {playerUrl && (
+                   <p className="text-xs text-slate-500 mt-1 break-all max-w-[200px] mx-auto">{playerUrl}</p>
+                 )}
+               </div>
             </div>
           </div>
 
