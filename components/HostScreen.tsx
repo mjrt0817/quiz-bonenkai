@@ -59,7 +59,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
         <div className="z-10 text-center space-y-8">
            <h1 className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 tracking-tight">
-             QUIZ EVENT
+             {state.quizTitle || 'QUIZ EVENT'}
            </h1>
            <div className="flex flex-col items-center gap-4 text-slate-400">
              <Loader2 size={48} className="animate-spin text-indigo-500"/>
@@ -84,7 +84,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
             <div className="text-left space-y-4">
                <div>
                  <span className="inline-block px-3 py-1 bg-indigo-600 text-xs font-bold rounded-full mb-2">ENTRY</span>
-                 <h1 className="text-5xl md:text-6xl font-black mb-2 tracking-wide text-white">参加受付中</h1>
+                 <h1 className="text-5xl md:text-6xl font-black mb-2 tracking-wide text-white">{state.quizTitle}</h1>
                  <p className="text-xl md:text-2xl text-indigo-300">QRコードを読み込んで参加してください</p>
                </div>
                
