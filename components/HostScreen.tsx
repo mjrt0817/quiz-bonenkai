@@ -78,33 +78,34 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   if (state.gameState === GameState.LOBBY) {
     return (
       <div className="flex flex-col h-screen bg-slate-900 text-white">
-        <main className="flex-1 flex flex-col items-center justify-center p-8 text-center relative">
-          <div className="flex flex-col lg:flex-row items-center gap-16 mb-12 z-10">
-            <div className="text-left space-y-6">
+        <main className="flex-1 flex flex-col items-center p-6 text-center relative overflow-hidden">
+          {/* Top Section: Info & QR */}
+          <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16 mb-6 z-10 shrink-0">
+            <div className="text-left space-y-4">
                <div>
                  <span className="inline-block px-3 py-1 bg-indigo-600 text-xs font-bold rounded-full mb-2">ENTRY</span>
-                 <h1 className="text-6xl font-black mb-2 tracking-wide text-white">参加受付中</h1>
-                 <p className="text-2xl text-indigo-300">QRコードを読み込んで参加してください</p>
+                 <h1 className="text-5xl md:text-6xl font-black mb-2 tracking-wide text-white">参加受付中</h1>
+                 <p className="text-xl md:text-2xl text-indigo-300">QRコードを読み込んで参加してください</p>
                </div>
                
-               <div className="space-y-4 text-lg">
-                  <div className="flex items-center gap-4 text-slate-300 bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                    <span className="w-10 h-10 rounded-full bg-white text-slate-900 flex items-center justify-center font-bold">1</span>
+               <div className="space-y-2 text-base hidden md:block">
+                  <div className="flex items-center gap-4 text-slate-300 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                    <span className="w-8 h-8 rounded-full bg-white text-slate-900 flex items-center justify-center font-bold">1</span>
                     <span>スマホでQRコードをスキャン</span>
                   </div>
-                  <div className="flex items-center gap-4 text-slate-300 bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                    <span className="w-10 h-10 rounded-full bg-white text-slate-900 flex items-center justify-center font-bold">2</span>
+                  <div className="flex items-center gap-4 text-slate-300 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                    <span className="w-8 h-8 rounded-full bg-white text-slate-900 flex items-center justify-center font-bold">2</span>
                     <span>ニックネームを入力して待機</span>
                   </div>
-                  <div className="mt-4 p-2 bg-black/30 rounded text-xs font-mono text-slate-500">
+                  <div className="mt-2 p-1 bg-black/30 rounded text-[10px] font-mono text-slate-500">
                     {playerUrl}
                   </div>
                </div>
             </div>
 
             {/* QR Code */}
-            <div className="p-8 bg-white rounded-3xl shadow-[0_0_50px_rgba(255,255,255,0.1)] transform rotate-2">
-               <div className="w-64 h-64 bg-slate-100 flex flex-col items-center justify-center overflow-hidden rounded-xl">
+            <div className="p-4 bg-white rounded-3xl shadow-[0_0_50px_rgba(255,255,255,0.1)] transform rotate-2">
+               <div className="w-48 h-48 bg-slate-100 flex flex-col items-center justify-center overflow-hidden rounded-xl">
                  {playerUrl ? (
                    <img 
                      src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(playerUrl)}`}
@@ -115,30 +116,32 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                    <QrCode size={80} className="text-slate-900" />
                  )}
                </div>
-               <div className="mt-4 text-center">
-                 <p className="font-bold text-slate-900 text-xl tracking-widest">JOIN NOW</p>
+               <div className="mt-2 text-center">
+                 <p className="font-bold text-slate-900 text-lg tracking-widest">JOIN NOW</p>
                </div>
             </div>
           </div>
 
-          {/* Player List */}
-          <div className="w-full max-w-6xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
-              <h3 className="text-2xl font-bold text-slate-400">
+          {/* Player List Area (Scrollable for 100+ users) */}
+          <div className="w-full max-w-7xl flex-1 flex flex-col min-h-0 bg-slate-900/50 rounded-t-2xl border-t border-slate-800 p-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-4 shrink-0">
+              <h3 className="text-xl font-bold text-slate-400">
                  Entry List
               </h3>
-              <span className="text-4xl font-black text-white">{state.players.length} <span className="text-lg font-normal text-slate-500">Players</span></span>
+              <span className="text-3xl font-black text-white">{state.players.length} <span className="text-sm font-normal text-slate-500">Players</span></span>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {state.players.map(player => (
-                <div key={player.id} className="p-4 bg-slate-800 rounded-xl border border-slate-700 flex items-center gap-3 animate-in zoom-in duration-300">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center font-bold text-xs">
-                    {player.name.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="font-bold truncate">{player.name}</span>
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                {state.players.map(player => (
+                    <div key={player.id} className="p-2 bg-slate-800 rounded-lg border border-slate-700 flex items-center gap-2 animate-in zoom-in duration-300">
+                    <div className="w-6 h-6 shrink-0 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center font-bold text-[10px]">
+                        {player.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="font-bold text-sm truncate w-full">{player.name}</span>
+                    </div>
+                ))}
                 </div>
-              ))}
             </div>
           </div>
         </main>
@@ -162,7 +165,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                 {isFinalQuestion && state.gameState !== GameState.FINAL_RESULT ? (
                   <div className="flex items-center gap-2">
                     <AlertTriangle size={28} className="animate-bounce"/>
-                    最終問題
+                    ⚠️ 最終問題
                   </div>
                 ) : 'Question'}
              </span>
