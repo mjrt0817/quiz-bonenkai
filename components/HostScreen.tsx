@@ -74,6 +74,17 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, updateState, onBack }) =
   const [error, setError] = useState('');
   const [showSimulator, setShowSimulator] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
+  const [playerUrl, setPlayerUrl] = useState('');
+
+  // Generate Player URL on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('role'); // Clear existing role
+      url.searchParams.set('role', 'player'); // Set player role
+      setPlayerUrl(url.toString());
+    }
+  }, []);
 
   // Timer Logic
   useEffect(() => {
@@ -313,7 +324,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, updateState, onBack }) =
                  </button>
                  
                  <a 
-                   href="?role=player" 
+                   href={playerUrl || '?role=player'}
                    target="_blank" 
                    rel="noopener noreferrer"
                    className="flex items-center gap-2 px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-lg transition w-full md:w-auto justify-center"
@@ -324,9 +335,18 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, updateState, onBack }) =
                </div>
             </div>
 
-            <div className="p-6 bg-white rounded-2xl shadow-2xl transform rotate-2 hover:rotate-0 transition duration-500 group cursor-pointer" onClick={() => setShowSimulator(true)}>
-               <div className="w-48 h-48 bg-slate-900 rounded-lg flex flex-col items-center justify-center gap-2 group-hover:bg-indigo-900 transition">
-                 <QrCode size={80} className="text-white group-hover:scale-110 transition-transform" />
+            {/* QR Code Display */}
+            <div className="p-6 bg-white rounded-2xl shadow-2xl transform rotate-2 hover:rotate-0 transition duration-500 group">
+               <div className="w-48 h-48 bg-white rounded-lg flex flex-col items-center justify-center overflow-hidden border-4 border-slate-900">
+                 {playerUrl ? (
+                   <img 
+                     src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(playerUrl)}`}
+                     alt="Join QR Code"
+                     className="w-full h-full object-cover"
+                   />
+                 ) : (
+                   <QrCode size={80} className="text-slate-900" />
+                 )}
                </div>
                <p className="mt-4 text-center font-bold text-slate-900 text-lg">スキャンして参加</p>
             </div>
