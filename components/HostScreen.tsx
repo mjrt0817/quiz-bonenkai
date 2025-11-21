@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
-import { Users, Trophy, CheckCircle, Sparkles, QrCode, Clock, Monitor, Loader2 } from 'lucide-react';
+import { Users, Trophy, CheckCircle, Sparkles, QrCode, Clock, Monitor, Loader2, Medal } from 'lucide-react';
 
 interface HostScreenProps {
   state: HostState;
   onBack: () => void;
 }
 
-// HostScreen is now a pure VIEWER for the projector. 
-// Controls have been moved to AdminDashboard.
 const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [playerUrl, setPlayerUrl] = useState('');
@@ -46,6 +44,8 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   const currentQ = state.questions && state.questions[state.currentQuestionIndex] 
     ? state.questions[state.currentQuestionIndex] 
     : { text: "Loading...", options: [], correctIndex: 0, explanation: "" };
+
+  const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
   // --- 1. SETUP MODE (Waiting for Admin) ---
   if (state.gameState === GameState.SETUP) {
@@ -153,9 +153,11 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
       {/* Top Bar */}
       <header className="bg-slate-900 p-6 flex justify-between items-center border-b border-slate-800 shadow-lg relative z-20">
         <div className="flex items-center gap-6">
-          <div className="px-4 py-2 bg-slate-800 rounded-lg border border-slate-700">
-             <span className="text-slate-400 text-sm font-bold block uppercase text-xs">Question</span>
-             <span className="text-2xl font-black font-mono text-white">{state.currentQuestionIndex + 1}<span className="text-slate-500 text-lg">/{state.questions.length}</span></span>
+          <div className={`px-4 py-2 rounded-lg border flex items-center gap-3 ${isFinalQuestion && state.gameState !== GameState.FINAL_RESULT ? 'bg-red-600 border-red-500' : 'bg-slate-800 border-slate-700'}`}>
+             <span className="text-white/80 text-sm font-bold block uppercase text-xs">
+                {isFinalQuestion && state.gameState !== GameState.FINAL_RESULT ? 'FINAL QUESTION' : 'Question'}
+             </span>
+             <span className="text-2xl font-black font-mono text-white">{state.currentQuestionIndex + 1}<span className="text-white/50 text-lg">/{state.questions.length}</span></span>
           </div>
         </div>
         
@@ -188,24 +190,74 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
       <main className="flex-1 flex flex-col p-8 max-w-7xl mx-auto w-full relative z-10">
         
         {state.gameState === GameState.FINAL_RESULT ? (
-           <div className="flex-1 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-700">
-             <Trophy size={120} className="text-yellow-400 mb-8 drop-shadow-[0_0_30px_rgba(250,204,21,0.6)]" />
-             <h1 className="text-7xl font-black mb-16 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-500 to-yellow-700">WINNER</h1>
+           <div className="flex-1 flex flex-col items-center justify-center relative">
+             <h1 className="text-6xl font-black mb-12 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-500 to-yellow-700 drop-shadow-lg text-center">
+               TOURNAMENT RESULTS
+             </h1>
              
-             <div className="w-full max-w-4xl grid gap-4">
-               {state.players.sort((a, b) => b.score - a.score).slice(0, 5).map((player, idx) => (
-                 <div key={player.id} className={`flex items-center p-6 rounded-3xl border-2 shadow-2xl transform transition-all ${idx === 0 ? 'bg-gradient-to-r from-yellow-900/80 to-slate-900 border-yellow-500 scale-110 z-10 mb-4' : 'bg-slate-800/80 border-slate-700'}`}>
-                   <div className={`w-16 h-16 rounded-full flex items-center justify-center font-black text-3xl mr-8 ${idx === 0 ? 'bg-yellow-400 text-yellow-900 shadow-[0_0_20px_rgba(250,204,21,0.8)]' : 'bg-slate-700 text-slate-300'}`}>
-                     {idx + 1}
-                   </div>
-                   <div className="flex-1">
-                     <h3 className={`${idx === 0 ? 'text-4xl' : 'text-2xl'} font-bold`}>{player.name}</h3>
-                   </div>
-                   <div className={`${idx === 0 ? 'text-5xl text-yellow-400' : 'text-3xl text-indigo-300'} font-mono font-bold`}>
-                     {player.score}
-                   </div>
-                 </div>
-               ))}
+             <div className="w-full grid grid-cols-1 gap-4 justify-items-center">
+               {/* Logic for Ranking Reveal Stages */}
+               {(() => {
+                   const sorted = [...state.players].sort((a, b) => b.score - a.score);
+                   const first = sorted[0];
+                   const second = sorted[1];
+                   const third = sorted[2];
+                   const others = sorted.slice(3);
+                   const stage = state.rankingRevealStage; // 0, 1, 2, 3
+
+                   return (
+                       <div className="w-full max-w-5xl flex flex-col items-center gap-8">
+                           
+                           {/* Stage 3: Winner (Gold) */}
+                           {stage >= 3 && first && (
+                               <div className="w-full max-w-2xl bg-gradient-to-b from-yellow-500/20 to-slate-900 border-4 border-yellow-500 p-8 rounded-3xl flex flex-col items-center justify-center shadow-[0_0_50px_rgba(234,179,8,0.5)] animate-in zoom-in duration-1000 relative overflow-hidden">
+                                   <div className="absolute inset-0 bg-yellow-500/10 animate-pulse"></div>
+                                   <Trophy size={80} className="text-yellow-400 mb-4 drop-shadow-lg" />
+                                   <h2 className="text-yellow-300 font-black text-2xl tracking-[0.2em] mb-2">WINNER</h2>
+                                   <div className="text-6xl md:text-7xl font-black text-white mb-4 text-center leading-tight">{first.name}</div>
+                                   <div className="text-5xl font-mono font-bold text-yellow-400">{first.score} <span className="text-2xl">pts</span></div>
+                               </div>
+                           )}
+
+                           <div className="flex flex-row gap-4 w-full justify-center items-end">
+                               {/* Stage 2: 2nd Place (Silver) */}
+                               {stage >= 2 && second && (
+                                   <div className="flex-1 max-w-sm bg-slate-800/80 border-2 border-slate-400 p-6 rounded-2xl flex flex-col items-center shadow-2xl animate-in slide-in-from-bottom-20 duration-700">
+                                       <Medal size={48} className="text-slate-300 mb-2" />
+                                       <h2 className="text-slate-400 font-bold text-lg tracking-widest mb-1">2ND PLACE</h2>
+                                       <div className="text-3xl font-bold text-white mb-2 truncate max-w-full">{second.name}</div>
+                                       <div className="text-3xl font-mono font-bold text-slate-300">{second.score}</div>
+                                   </div>
+                               )}
+
+                               {/* Stage 1: 3rd Place (Bronze) */}
+                               {stage >= 1 && third && (
+                                   <div className="flex-1 max-w-sm bg-slate-800/80 border-2 border-amber-700 p-6 rounded-2xl flex flex-col items-center shadow-2xl animate-in slide-in-from-bottom-20 duration-700 order-first md:order-last">
+                                       <Medal size={48} className="text-amber-600 mb-2" />
+                                       <h2 className="text-amber-700 font-bold text-lg tracking-widest mb-1">3RD PLACE</h2>
+                                       <div className="text-3xl font-bold text-white mb-2 truncate max-w-full">{third.name}</div>
+                                       <div className="text-3xl font-mono font-bold text-amber-600">{third.score}</div>
+                                   </div>
+                               )}
+                           </div>
+
+                           {/* Stage 0: Others (Grid) */}
+                           {stage >= 0 && others.length > 0 && (
+                               <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 opacity-80">
+                                   {others.slice(0, 8).map((p, i) => (
+                                       <div key={p.id} className="bg-slate-800/50 border border-slate-700 p-3 rounded flex items-center justify-between text-sm">
+                                           <div className="flex items-center gap-2">
+                                               <span className="text-slate-500 font-mono">#{i+4}</span>
+                                               <span className="font-bold truncate">{p.name}</span>
+                                           </div>
+                                           <span className="font-mono text-slate-400">{p.score}</span>
+                                       </div>
+                                   ))}
+                               </div>
+                           )}
+                       </div>
+                   );
+               })()}
              </div>
            </div>
         ) : (
