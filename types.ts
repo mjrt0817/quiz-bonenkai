@@ -23,11 +23,6 @@ export interface Player {
   isOnline?: boolean; // Track connection status roughly
 }
 
-export interface BroadcastMessage {
-  type: 'SYNC_STATE' | 'PLAYER_JOIN' | 'PLAYER_ANSWER' | 'ADMIN_ACTION';
-  payload?: any;
-}
-
 export interface HostState {
   gameState: GameState;
   currentQuestionIndex: number;
