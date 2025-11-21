@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, Player, BTN_LABELS, COLORS } from '../types';
-import { User, Loader, Check, X, Trophy, LogOut, AlertCircle, Sparkles, Lock, Medal, AlertTriangle } from 'lucide-react';
+import { User, Loader, Check, X, Trophy, LogOut, AlertCircle, Sparkles, Lock, Medal, AlertTriangle, PartyPopper } from 'lucide-react';
 
 interface PlayerScreenProps {
   state: HostState;
@@ -221,20 +221,40 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
      const myRank = myRankIndex + 1;
      
      // Determine visibility based on stage
-     // Stage 0: Show >4th place. Hide 1st, 2nd, 3rd.
-     // Stage 1: Show 3rd. Hide 1st, 2nd.
-     // Stage 2: Show 2nd. Hide 1st.
-     // Stage 3: Show 1st.
-     
      let showMyResult = false;
      if (myRank > 3) {
-         showMyResult = true; // Always show if not in top 3
+         showMyResult = true; // Always show if not in top 3 (unless hiding below top 3)
      } else if (myRank === 3 && state.rankingRevealStage >= 1) {
          showMyResult = true;
      } else if (myRank === 2 && state.rankingRevealStage >= 2) {
          showMyResult = true;
      } else if (myRank === 1 && state.rankingRevealStage >= 3) {
          showMyResult = true;
+     }
+
+     // Special case: If host enabled "hide below top 3" AND I am > 3rd
+     if (state.hideBelowTop3 && myRank > 3) {
+         return (
+             <div className="h-full bg-slate-900 flex flex-col items-center justify-center p-8 text-white text-center relative">
+                 <div className="z-10 flex flex-col items-center">
+                     <div className="w-24 h-24 bg-indigo-600 rounded-full flex items-center justify-center mb-6 animate-in zoom-in">
+                        <PartyPopper size={40} className="text-white" />
+                     </div>
+                     <h2 className="text-3xl font-black mb-4 text-white">
+                         THANK YOU!
+                     </h2>
+                     <p className="text-lg text-indigo-200 mb-8">
+                         ご参加ありがとうございました！<br/>
+                         クイズ大会は終了です。
+                     </p>
+                     <div className="text-3xl font-mono font-bold text-indigo-400 mb-2">{currentPlayer?.score} pts</div>
+                     <button onClick={onBack} className="mt-8 flex items-center gap-2 text-slate-500 hover:text-white transition">
+                        <LogOut size={16} />
+                        Exit
+                    </button>
+                 </div>
+             </div>
+         );
      }
 
      if (!showMyResult) {
@@ -262,7 +282,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
          );
      }
 
-     // Revealed Result
+     // Revealed Result (Normal)
      return (
          <div className="h-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center relative overflow-hidden">
              {myRank === 1 && <div className="absolute inset-0 bg-gradient-to-b from-yellow-600/20 to-slate-900 animate-pulse"></div>}
