@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz } from '../services/csvService';
 import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy } from 'lucide-react';
@@ -8,7 +8,7 @@ interface AdminDashboardProps {
   updateState: (updater: (prev: HostState) => HostState) => void;
   resetPlayerAnswers: () => Promise<void>;
   resetPlayerScores: () => Promise<void>;
-  calculateAndSaveScores: () => Promise<void>; // Added this
+  calculateAndSaveScores: () => Promise<void>;
   kickPlayer: (id: string) => Promise<void>;
   resetAllPlayers: () => Promise<void>;
   onBack: () => void;
@@ -20,6 +20,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [csvUrl, setCsvUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+
+  // Optimize player sorting using useMemo to prevent re-calculations on every render
+  const sortedPlayers = useMemo(() => {
+    return [...state.players].sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.name.localeCompare(b.name);
+    });
+  }, [state.players]);
 
   // --- Game Control Functions ---
   
@@ -271,11 +279,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-100 text-sm">
-                 {state.players.length === 0 ? (
+                 {sortedPlayers.length === 0 ? (
                    <tr><td colSpan={4} className="p-8 text-center text-slate-400">参加者はまだいません</td></tr>
                  ) : (
-                   // Sort by score desc for Admin view
-                   [...state.players].sort((a, b) => b.score - a.score).map((player, index) => {
+                   sortedPlayers.map((player, index) => {
                      const hasAns = player.lastAnswerIndex !== null && player.lastAnswerIndex !== undefined;
                      // Check correctness if needed (only during result)
                      const isCorrect = state.gameState === GameState.PLAYING_RESULT && player.lastAnswerIndex === state.questions[state.currentQuestionIndex].correctIndex;
