@@ -13,6 +13,7 @@ const INITIAL_HOST_STATE: HostState = {
   roomCode: 'EVENT',
   timeLimit: 20,
   questionStartTime: null,
+  rankingRevealStage: 0,
 };
 
 export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
@@ -104,6 +105,26 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     }
   }, [role, hostState.players]);
 
+  const calculateAndSaveScores = useCallback(async () => {
+    if (role !== 'HOST' && role !== 'ADMIN') return;
+    if (!hostState.questions || !hostState.questions[hostState.currentQuestionIndex]) return;
+
+    const currentQ = hostState.questions[hostState.currentQuestionIndex];
+    const updates: any = {};
+    
+    hostState.players.forEach(p => {
+      // Calculate score only if correct
+      if (p.lastAnswerIndex === currentQ.correctIndex) {
+         const newScore = (p.score || 0) + 10; // 10 points per correct answer
+         updates[`rooms/${ROOM_ID}/players/${p.id}/score`] = newScore;
+      }
+    });
+
+    if (Object.keys(updates).length > 0) {
+      await update(ref(db), updates);
+    }
+  }, [role, hostState.players, hostState.questions, hostState.currentQuestionIndex]);
+
   const kickPlayer = useCallback(async (targetPlayerId: string) => {
     if (role !== 'HOST' && role !== 'ADMIN') return;
     await remove(ref(db, `rooms/${ROOM_ID}/players/${targetPlayerId}`));
@@ -184,6 +205,7 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     submitAnswer,
     resetPlayerAnswers,
     resetPlayerScores,
+    calculateAndSaveScores,
     kickPlayer,
     resetAllPlayers
   };
