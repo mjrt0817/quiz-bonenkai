@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { BroadcastMessage, GameState, HostState, Player } from '../types';
+import { useState, useEffect, useCallback } from 'react';
+import { GameState, HostState, Player } from '../types';
 import { db } from '../services/firebaseConfig';
-import { ref, set, onValue, push, remove, onDisconnect, update } from 'firebase/database';
+import { ref, set, onValue, update, remove, get } from 'firebase/database';
 
-// Using a fixed room ID for simplicity for the event
 const ROOM_ID = 'party-room-2024';
 
 const INITIAL_HOST_STATE: HostState = {
@@ -16,50 +15,40 @@ const INITIAL_HOST_STATE: HostState = {
   questionStartTime: null,
 };
 
-export const useGameCommunication = (role: 'HOST' | 'PLAYER') => {
+export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
   const [hostState, setHostState] = useState<HostState>(INITIAL_HOST_STATE);
-  const [playerId] = useState(() => {
-    const stored = localStorage.getItem('quiz_player_id');
-    if (stored) return stored;
-    const newId = `p-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-    localStorage.setItem('quiz_player_id', newId);
-    return newId;
-  });
+  const [playerId, setPlayerId] = useState(() => localStorage.getItem('quiz_player_id') || '');
+  const [joinError, setJoinError] = useState<string | null>(null);
 
-  // --- HOST LOGIC ---
+  // --- SYNC STATE (ALL ROLES) ---
   useEffect(() => {
-    if (role !== 'HOST') return;
-
+    // Subscribe to global state
     const stateRef = ref(db, `rooms/${ROOM_ID}/state`);
-    
     const unsubscribeState = onValue(stateRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         setHostState(data);
-      } else {
+      } else if (role === 'HOST' || role === 'ADMIN') {
+        // If no state exists and we are host/admin, initialize it
         set(stateRef, INITIAL_HOST_STATE);
       }
     });
     
+    // Subscribe to players list separately for realtime updates
     const playersRef = ref(db, `rooms/${ROOM_ID}/players`);
-
     const unsubPlayers = onValue(playersRef, (snap) => {
       const playersObj = snap.val() || {};
       const playersList = Object.values(playersObj) as Player[];
       
-      setHostState(prev => {
-        const newState = {
-          ...prev,
-          players: playersList
-        };
-        
-        // CRITICAL FIX: Sync updated player list (with answers) back to shared state
-        // This ensures players see their updated status immediately
-        const statePlayersRef = ref(db, `rooms/${ROOM_ID}/state/players`);
-        set(statePlayersRef, playersList).catch(err => console.error("Sync players failed", err));
-        
-        return newState;
-      });
+      // Update local state with latest players
+      setHostState(prev => ({ ...prev, players: playersList }));
+      
+      // HOST/ADMIN responsibility: Keep the 'state.players' in sync with 'players' node
+      // This ensures redundancy and consistency
+      if (role === 'HOST' || role === 'ADMIN') {
+         const statePlayersRef = ref(db, `rooms/${ROOM_ID}/state/players`);
+         set(statePlayersRef, playersList).catch(err => console.error("Sync players failed", err));
+      }
     });
 
     return () => {
@@ -69,26 +58,10 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER') => {
   }, [role]);
 
 
-  // --- PLAYER LOGIC ---
-  useEffect(() => {
-    if (role !== 'PLAYER') return;
-
-    const stateRef = ref(db, `rooms/${ROOM_ID}/state`);
-    const unsubscribe = onValue(stateRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setHostState(data);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [role]);
-
-
-  // --- HOST ACTIONS ---
+  // --- ADMIN / HOST ACTIONS ---
   
   const updateHostState = useCallback((updater: (prev: HostState) => HostState) => {
-    if (role !== 'HOST') return;
+    if (role !== 'HOST' && role !== 'ADMIN') return;
 
     setHostState(prev => {
       const newState = updater(prev);
@@ -98,9 +71,8 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER') => {
     });
   }, [role]);
 
-  // Reset all players' answer index to null (for next question)
   const resetPlayerAnswers = useCallback(async () => {
-    if (role !== 'HOST') return;
+    if (role !== 'HOST' && role !== 'ADMIN') return;
     const updates: any = {};
     hostState.players.forEach(p => {
         updates[`rooms/${ROOM_ID}/players/${p.id}/lastAnswerIndex`] = null;
@@ -110,9 +82,8 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER') => {
     }
   }, [role, hostState.players]);
 
-  // Reset scores and answers (for new game)
   const resetPlayerScores = useCallback(async () => {
-    if (role !== 'HOST') return;
+    if (role !== 'HOST' && role !== 'ADMIN') return;
     const updates: any = {};
     hostState.players.forEach(p => {
         updates[`rooms/${ROOM_ID}/players/${p.id}/score`] = 0;
@@ -123,22 +94,62 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER') => {
     }
   }, [role, hostState.players]);
 
+  const kickPlayer = useCallback(async (targetPlayerId: string) => {
+    if (role !== 'HOST' && role !== 'ADMIN') return;
+    await remove(ref(db, `rooms/${ROOM_ID}/players/${targetPlayerId}`));
+  }, [role]);
+
+  const resetAllPlayers = useCallback(async () => {
+    if (role !== 'HOST' && role !== 'ADMIN') return;
+    await remove(ref(db, `rooms/${ROOM_ID}/players`));
+  }, [role]);
+
 
   // --- PLAYER ACTIONS ---
 
-  const joinGame = useCallback((name: string) => {
-    if (role !== 'PLAYER') return;
+  const joinGame = useCallback(async (name: string) => {
+    if (role !== 'PLAYER') return false;
+    setJoinError(null);
     
-    const player: Player = {
-      id: playerId,
-      name,
-      score: 0,
-      lastAnswerIndex: null,
-      lastAnswerTime: 0
-    };
+    // Check for duplicate name
+    const playersRef = ref(db, `rooms/${ROOM_ID}/players`);
+    const snapshot = await get(playersRef);
+    const playersObj = snapshot.val() || {};
+    const playersList = Object.values(playersObj) as Player[];
+    
+    const existingPlayer = playersList.find(p => p.name === name);
 
-    const playerRef = ref(db, `rooms/${ROOM_ID}/players/${playerId}`);
-    set(playerRef, player);
+    let targetId = playerId;
+
+    if (existingPlayer) {
+      // RECOVERY LOGIC: Name exists, so we assume it's the same person reconnecting
+      targetId = existingPlayer.id;
+      setPlayerId(targetId);
+      localStorage.setItem('quiz_player_id', targetId);
+      
+      // Update status (optional)
+      const playerRef = ref(db, `rooms/${ROOM_ID}/players/${targetId}`);
+      update(playerRef, { isOnline: true });
+    } else {
+      // NEW PLAYER
+      if (!targetId) {
+        targetId = `p-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        setPlayerId(targetId);
+        localStorage.setItem('quiz_player_id', targetId);
+      }
+      
+      const player: Player = {
+        id: targetId,
+        name,
+        score: 0,
+        lastAnswerIndex: null,
+        lastAnswerTime: 0,
+        isOnline: true
+      };
+      const playerRef = ref(db, `rooms/${ROOM_ID}/players/${targetId}`);
+      await set(playerRef, player);
+    }
+    return true;
   }, [role, playerId]);
 
   const submitAnswer = useCallback((index: number) => {
@@ -155,10 +166,13 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER') => {
   return {
     hostState,
     playerId,
+    joinError,
     updateHostState,
     joinGame,
     submitAnswer,
     resetPlayerAnswers,
-    resetPlayerScores
+    resetPlayerScores,
+    kickPlayer,
+    resetAllPlayers
   };
 };
