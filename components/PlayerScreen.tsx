@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, Player, BTN_LABELS, COLORS } from '../types';
-import { User, Loader, Check, X, Trophy, LogOut, AlertCircle } from 'lucide-react';
+import { User, Loader, Check, X, Trophy, LogOut, AlertCircle, Sparkles, Lock, Medal } from 'lucide-react';
 
 interface PlayerScreenProps {
   state: HostState;
@@ -122,97 +122,166 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
     );
   }
 
-  // --- 3. PLAYING ---
+  // --- 3. PLAYING: QUESTION ---
   if (state.gameState === GameState.PLAYING_QUESTION) {
     if (hasAnswered) {
        return (
          <div className="h-full bg-slate-800 flex flex-col items-center justify-center p-6 text-white">
-           <div className="w-24 h-24 bg-slate-700 rounded-full flex items-center justify-center mb-6 animate-pulse">
-             <Check size={40} />
+           <div className="w-24 h-24 bg-indigo-500 rounded-full flex items-center justify-center mb-6 animate-bounce-short">
+             <Check size={48} />
            </div>
-           <h2 className="text-2xl font-bold">回答を送信しました！</h2>
-           <p className="text-slate-400 mt-2">結果発表をお待ちください...</p>
+           <h2 className="text-3xl font-bold mb-2">回答を送信しました</h2>
+           <p className="text-slate-400">結果発表をお待ちください...</p>
          </div>
        );
     }
 
     return (
-      <div className="h-full bg-slate-100 flex flex-col">
-         <div className="h-2 bg-slate-200 w-full">
+      <div className="h-full bg-slate-900 flex flex-col p-4 pb-8">
+        {/* Timer Bar */}
+        <div className="w-full h-2 bg-slate-800 rounded-full mb-6 overflow-hidden">
            <div 
-             className={`h-full transition-all ease-linear duration-100 ${timeLeft < 5 ? 'bg-red-500' : 'bg-indigo-500'}`}
+             className="h-full bg-indigo-500 transition-all duration-100 ease-linear"
              style={{ width: `${(timeLeft / state.timeLimit) * 100}%` }}
            />
-         </div>
+        </div>
 
-         <div className="bg-white p-6 shadow-sm border-b text-center">
-            <div className="flex justify-between items-center mb-1">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Q {state.currentQuestionIndex + 1}</span>
-                <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">{Math.ceil(timeLeft)}秒</span>
-            </div>
-            <p className="text-slate-800 font-medium truncate opacity-50">画面を見て答えを選んでください</p>
-         </div>
-         
-         <div className="flex-1 p-4 grid grid-cols-2 gap-4 content-center max-w-md mx-auto w-full">
-           {COLORS.map((colorClass, idx) => (
+        <div className="flex-1 flex flex-col justify-center gap-4">
+           {state.questions[state.currentQuestionIndex]?.options.map((opt, idx) => (
              <button
                key={idx}
                onClick={() => onAnswer(idx)}
-               className={`h-32 rounded-2xl shadow-lg flex flex-col items-center justify-center text-white active:scale-95 transition-transform ${colorClass}`}
+               className={`${COLORS[idx]} w-full h-24 rounded-2xl shadow-lg flex items-center px-6 gap-4 active:scale-95 transition-transform`}
              >
-               <span className="text-4xl font-black mb-1">{BTN_LABELS[idx]}</span>
+               <div className="w-10 h-10 bg-black/20 rounded-full flex items-center justify-center font-bold text-white text-xl">
+                 {BTN_LABELS[idx]}
+               </div>
+               <span className="text-white font-bold text-xl text-left leading-tight line-clamp-2">{opt}</span>
              </button>
            ))}
-         </div>
-      </div>
-    );
-  }
-
-  // --- 4. RESULT ---
-  if (state.gameState === GameState.PLAYING_RESULT) {
-    const currentQ = state.questions[state.currentQuestionIndex];
-    const myAnswer = currentPlayer?.lastAnswerIndex;
-    const isCorrect = myAnswer === currentQ.correctIndex;
-    
-    return (
-      <div className={`h-full flex flex-col items-center justify-center p-6 text-white transition-colors duration-500 ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`}>
-         <div className="bg-white/20 p-8 rounded-full mb-6 backdrop-blur-sm">
-           {isCorrect ? <Check size={64} strokeWidth={4} /> : <X size={64} strokeWidth={4} />}
-         </div>
-         
-         <h2 className="text-4xl font-black uppercase mb-2 tracking-wider">
-           {isCorrect ? '正解！' : '不正解...'}
-         </h2>
-         
-         <div className="mt-8 bg-black/20 px-8 py-4 rounded-xl text-center backdrop-blur-sm">
-           <p className="text-sm uppercase opacity-75 mb-1">現在のスコア</p>
-           <p className="text-3xl font-mono font-bold">{currentPlayer?.score}</p>
-         </div>
-      </div>
-    );
-  }
-
-  // --- 5. FINAL RANKING ---
-  if (state.gameState === GameState.FINAL_RESULT) {
-    const sorted = [...state.players].sort((a, b) => b.score - a.score);
-    const rank = sorted.findIndex(p => p.id === playerId) + 1;
-
-    return (
-      <div className="h-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white relative">
-        <Trophy className="text-yellow-400 w-20 h-20 mb-6" />
-        <h2 className="text-3xl font-bold mb-2">クイズ終了！</h2>
-        
-        <div className="bg-slate-800 p-8 rounded-2xl w-full max-w-xs text-center border border-slate-700 mt-4 shadow-xl">
-           <p className="text-slate-400 text-sm uppercase tracking-widest mb-4">あなたの順位</p>
-           <div className="text-6xl font-black text-white mb-4">#{rank}</div>
-           <div className="h-px bg-slate-700 w-full my-4"></div>
-           <p className="text-indigo-400 font-bold text-xl">{currentPlayer?.score} 点</p>
         </div>
       </div>
     );
   }
 
-  return <div>Loading...</div>;
+  // --- 4. PLAYING: RESULT ---
+  if (state.gameState === GameState.PLAYING_RESULT) {
+    const currentQ = state.questions[state.currentQuestionIndex];
+    const myAnswer = currentPlayer?.lastAnswerIndex;
+    const isCorrect = myAnswer === currentQ.correctIndex;
+    const noAnswer = myAnswer === null || myAnswer === undefined;
+
+    return (
+      <div className={`h-full flex flex-col items-center justify-center p-6 text-center ${isCorrect ? 'bg-green-600' : 'bg-red-600'} text-white`}>
+        <div className="mb-6">
+           {isCorrect ? (
+             <div className="w-32 h-32 bg-white text-green-600 rounded-full flex items-center justify-center shadow-2xl animate-in zoom-in">
+                <Check size={64} strokeWidth={4} />
+             </div>
+           ) : (
+             <div className="w-32 h-32 bg-white text-red-600 rounded-full flex items-center justify-center shadow-2xl animate-in zoom-in">
+                <X size={64} strokeWidth={4} />
+             </div>
+           )}
+        </div>
+        
+        <h2 className="text-4xl font-black mb-2">{isCorrect ? 'CORRECT!' : (noAnswer ? 'TIME UP' : 'WRONG')}</h2>
+        <div className="text-xl font-bold opacity-90 mb-8">
+          {isCorrect ? '+10 Points' : 'Don\'t give up!'}
+        </div>
+
+        <div className="w-full max-w-sm bg-black/20 p-6 rounded-xl text-left backdrop-blur-sm">
+          <p className="text-xs uppercase opacity-70 mb-1 font-bold">Answer</p>
+          <p className="text-xl font-bold">{currentQ.options[currentQ.correctIndex]}</p>
+        </div>
+        
+        <div className="mt-8 flex flex-col items-center">
+           <p className="text-sm opacity-70 mb-1">Current Score</p>
+           <p className="text-4xl font-mono font-bold">{currentPlayer?.score}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // --- 5. FINAL RESULT (Staged Reveal) ---
+  if (state.gameState === GameState.FINAL_RESULT) {
+     // Calculate Rank
+     const sortedPlayers = [...state.players].sort((a, b) => b.score - a.score);
+     const myRankIndex = sortedPlayers.findIndex(p => p.id === playerId);
+     const myRank = myRankIndex + 1;
+     
+     // Determine visibility based on stage
+     // Stage 0: Show >4th place. Hide 1st, 2nd, 3rd.
+     // Stage 1: Show 3rd. Hide 1st, 2nd.
+     // Stage 2: Show 2nd. Hide 1st.
+     // Stage 3: Show 1st.
+     
+     let showMyResult = false;
+     if (myRank > 3) {
+         showMyResult = true; // Always show if not in top 3
+     } else if (myRank === 3 && state.rankingRevealStage >= 1) {
+         showMyResult = true;
+     } else if (myRank === 2 && state.rankingRevealStage >= 2) {
+         showMyResult = true;
+     } else if (myRank === 1 && state.rankingRevealStage >= 3) {
+         showMyResult = true;
+     }
+
+     if (!showMyResult) {
+         // Suspense Screen for Top Rankers
+         return (
+             <div className="h-full bg-slate-900 flex flex-col items-center justify-center p-8 text-white text-center relative overflow-hidden">
+                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
+                 <div className="z-10 flex flex-col items-center">
+                     <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center mb-6 animate-pulse-fast shadow-[0_0_30px_rgba(99,102,241,0.5)]">
+                        <Sparkles size={40} className="text-white" />
+                     </div>
+                     <h2 className="text-3xl font-black mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-yellow-500">
+                         TOP RANKER!
+                     </h2>
+                     <p className="text-xl text-indigo-200 mb-8">
+                         あなたはTOP3に入りました！<br/>
+                         スクリーンでの発表をお待ちください...
+                     </p>
+                     <div className="px-6 py-2 bg-white/10 rounded-full backdrop-blur-md border border-white/20">
+                         <Lock size={16} className="inline mr-2 mb-1" />
+                         <span>Result Hidden</span>
+                     </div>
+                 </div>
+             </div>
+         );
+     }
+
+     // Revealed Result
+     return (
+         <div className="h-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center relative overflow-hidden">
+             {myRank === 1 && <div className="absolute inset-0 bg-gradient-to-b from-yellow-600/20 to-slate-900 animate-pulse"></div>}
+             
+             <div className="z-10 flex flex-col items-center">
+                {myRank === 1 ? (
+                    <Trophy size={80} className="text-yellow-400 mb-4 drop-shadow-[0_0_15px_rgba(250,204,21,0.5)] animate-bounce-short" />
+                ) : myRank === 2 ? (
+                    <Medal size={80} className="text-slate-300 mb-4" />
+                ) : myRank === 3 ? (
+                    <Medal size={80} className="text-amber-600 mb-4" />
+                ) : (
+                    <div className="text-6xl font-black text-slate-600 mb-4">#{myRank}</div>
+                )}
+
+                <h2 className="text-2xl font-bold text-slate-400 uppercase tracking-widest mb-2">Final Ranking</h2>
+                <div className="text-6xl font-black mb-2">{myRank}<span className="text-2xl align-top ml-1">位</span></div>
+                <div className="text-3xl font-mono font-bold text-indigo-400 mb-8">{currentPlayer?.score} pts</div>
+                
+                <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-white transition">
+                    <LogOut size={16} />
+                    Exit
+                </button>
+             </div>
+         </div>
+     );
+  }
+
+  return null;
 };
 
 export default PlayerScreen;
