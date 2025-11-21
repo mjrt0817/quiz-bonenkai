@@ -117,12 +117,18 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, updateState, onBack, res
     setError('');
     try {
       const questions = await generateQuizQuestions(topic);
+      
+      if (!questions || questions.length === 0) {
+        throw new Error("クイズが生成されませんでした。別のトピックを試してください。");
+      }
+
       updateState(prev => ({
         ...prev,
         questions,
         gameState: GameState.LOBBY
       }));
     } catch (err) {
+      console.error(err);
       setError("クイズの生成に失敗しました。APIキーを確認するか、別のトピックを試してください。");
     } finally {
       setIsLoading(false);
