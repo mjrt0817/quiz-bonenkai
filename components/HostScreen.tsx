@@ -257,10 +257,10 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                                )}
                            </div>
 
-                           {/* Stage 0: Others (Grid) */}
-                           {stage >= 0 && others.length > 0 && (
-                               <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 opacity-80">
-                                   {others.slice(0, 8).map((p, i) => (
+                           {/* Stage 0: Others (Grid) - Hidden if hideBelowTop3 is true */}
+                           {stage >= 0 && others.length > 0 && !state.hideBelowTop3 && (
+                               <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 opacity-80 animate-in fade-in duration-500">
+                                   {others.slice(0, 16).map((p, i) => (
                                        <div key={p.id} className="bg-slate-800/50 border border-slate-700 p-3 rounded flex items-center justify-between text-sm">
                                            <div className="flex items-center gap-2">
                                                <span className="text-slate-500 font-mono">#{i+4}</span>
@@ -269,6 +269,11 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                                            <span className="font-mono text-slate-400">{p.score}</span>
                                        </div>
                                    ))}
+                                   {others.length > 16 && (
+                                       <div className="col-span-full text-center text-slate-500 italic text-xs p-2">
+                                           ...and {others.length - 16} more
+                                       </div>
+                                   )}
                                </div>
                            )}
                        </div>
