@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -18,8 +18,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   state, updateState, resetPlayerAnswers, resetPlayerScores, calculateAndSaveScores, kickPlayer, resetAllPlayers, onBack 
 }) => {
   const [csvUrl, setCsvUrl] = useState('');
+  const [titleInput, setTitleInput] = useState(state.quizTitle || 'クイズ大会');
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+
+  useEffect(() => {
+    if(state.quizTitle) setTitleInput(state.quizTitle);
+  }, [state.quizTitle]);
 
   // Optimize player sorting using useMemo to prevent re-calculations on every render
   const sortedPlayers = useMemo(() => {
@@ -43,7 +48,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         gameState: GameState.LOBBY,
         currentQuestionIndex: 0,
         rankingRevealStage: 0,
-        hideBelowTop3: false
+        hideBelowTop3: false,
+        quizTitle: titleInput
       }));
       setStatusMsg(`読み込み成功！ ${questions.length}問セットされました。`);
     } catch (err: any) {
@@ -135,6 +141,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="flex items-center gap-4">
            <h1 className="text-xl font-bold bg-red-600 px-3 py-1 rounded">ADMIN MODE</h1>
            <span className="text-slate-400 text-sm">Status: {state.gameState}</span>
+           <span className="text-slate-400 text-sm border-l border-slate-700 pl-4">Title: {state.quizTitle}</span>
         </div>
         <button onClick={onBack} className="text-sm hover:underline text-slate-300">終了する</button>
       </header>
@@ -157,13 +164,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <h2 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-700"><RefreshCw size={20}/> クイズ読み込み</h2>
             {state.questions.length === 0 ? (
               <div className="space-y-3">
-                <input 
-                  type="text" 
-                  value={csvUrl}
-                  onChange={(e) => setCsvUrl(e.target.value)}
-                  placeholder="CSVの公開URLを貼り付け"
-                  className="w-full px-3 py-2 border rounded text-sm"
-                />
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500">大会タイトル</label>
+                  <div className="flex items-center gap-2">
+                    <Type size={16} className="text-slate-400"/>
+                    <input 
+                      type="text" 
+                      value={titleInput}
+                      onChange={(e) => setTitleInput(e.target.value)}
+                      placeholder="例: 2024 忘年会クイズ"
+                      className="w-full px-3 py-2 border rounded text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500">CSV URL</label>
+                  <input 
+                    type="text" 
+                    value={csvUrl}
+                    onChange={(e) => setCsvUrl(e.target.value)}
+                    placeholder="CSVの公開URLを貼り付け"
+                    className="w-full px-3 py-2 border rounded text-sm"
+                  />
+                </div>
                 <p className="text-xs text-slate-500">※ スプレッドシートを「ウェブに公開(CSV)」してURLを取得してください</p>
                 <button 
                   onClick={loadQuestions}
@@ -177,6 +200,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             ) : (
               <div className="space-y-3">
                 <p className="text-sm font-bold text-green-600">✅ {state.questions.length}問 ロード済み</p>
+                <p className="text-xs text-slate-500">Title: {state.quizTitle}</p>
                 <button onClick={resetGame} className="w-full border border-slate-300 py-2 rounded text-xs hover:bg-slate-50">
                   クイズデータを破棄してリセット
                 </button>
