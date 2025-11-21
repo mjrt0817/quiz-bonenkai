@@ -42,7 +42,10 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
   const answerCount = state.players.filter(p => p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
   const totalPlayers = state.players.length;
-  const currentQ = state.questions[state.currentQuestionIndex];
+  // Safety check for current question
+  const currentQ = state.questions && state.questions[state.currentQuestionIndex] 
+    ? state.questions[state.currentQuestionIndex] 
+    : { text: "Loading...", options: [], correctIndex: 0, explanation: "" };
 
   // --- 1. SETUP MODE (Waiting for Admin) ---
   if (state.gameState === GameState.SETUP) {
@@ -92,6 +95,9 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                   <div className="flex items-center gap-4 text-slate-300 bg-slate-800/50 p-4 rounded-xl border border-slate-700">
                     <span className="w-10 h-10 rounded-full bg-white text-slate-900 flex items-center justify-center font-bold">2</span>
                     <span>ニックネームを入力して待機</span>
+                  </div>
+                  <div className="mt-4 p-2 bg-black/30 rounded text-xs font-mono text-slate-500">
+                    {playerUrl}
                   </div>
                </div>
             </div>
@@ -211,7 +217,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 h-[40vh]">
-              {currentQ.options.map((opt, idx) => {
+              {currentQ.options && currentQ.options.map((opt, idx) => {
                 const isReveal = state.gameState === GameState.PLAYING_RESULT;
                 const isCorrect = idx === currentQ.correctIndex;
                 
