@@ -20,6 +20,7 @@ export interface Player {
   score: number;
   lastAnswerIndex: number | null; // -1 for no answer, 0-3 for index
   lastAnswerTime: number; // For tie-breaking
+  totalResponseTime?: number; // Total milliseconds taken to answer across all questions
   isOnline?: boolean; // Track connection status roughly
 }
 
