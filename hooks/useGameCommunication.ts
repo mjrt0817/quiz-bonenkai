@@ -27,7 +27,13 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     const unsubscribeState = onValue(stateRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        setHostState(data);
+        // Ensure basic structure prevents crashes
+        setHostState({
+            ...INITIAL_HOST_STATE,
+            ...data,
+            questions: data.questions || [],
+            players: data.players || []
+        });
       } else if (role === 'HOST' || role === 'ADMIN') {
         // If no state exists and we are host/admin, initialize it
         set(stateRef, INITIAL_HOST_STATE);
@@ -73,6 +79,8 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
 
   const resetPlayerAnswers = useCallback(async () => {
     if (role !== 'HOST' && role !== 'ADMIN') return;
+    if (hostState.players.length === 0) return;
+    
     const updates: any = {};
     hostState.players.forEach(p => {
         updates[`rooms/${ROOM_ID}/players/${p.id}/lastAnswerIndex`] = null;
@@ -84,6 +92,8 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
 
   const resetPlayerScores = useCallback(async () => {
     if (role !== 'HOST' && role !== 'ADMIN') return;
+    if (hostState.players.length === 0) return;
+
     const updates: any = {};
     hostState.players.forEach(p => {
         updates[`rooms/${ROOM_ID}/players/${p.id}/score`] = 0;
@@ -111,7 +121,7 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     if (role !== 'PLAYER') return false;
     setJoinError(null);
     
-    // Check for duplicate name
+    // Check existing players
     const playersRef = ref(db, `rooms/${ROOM_ID}/players`);
     const snapshot = await get(playersRef);
     const playersObj = snapshot.val() || {};
@@ -123,15 +133,17 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
 
     if (existingPlayer) {
       // RECOVERY LOGIC: Name exists, so we assume it's the same person reconnecting
+      // We overwrite the local session ID with the existing one found in DB
       targetId = existingPlayer.id;
       setPlayerId(targetId);
       localStorage.setItem('quiz_player_id', targetId);
       
-      // Update status (optional)
+      // Mark as online
       const playerRef = ref(db, `rooms/${ROOM_ID}/players/${targetId}`);
       update(playerRef, { isOnline: true });
     } else {
       // NEW PLAYER
+      // If we have a leftover ID but that name isn't in DB anymore (maybe reset?), keep ID but set new name
       if (!targetId) {
         targetId = `p-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
         setPlayerId(targetId);
