@@ -160,7 +160,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center">
              <p className="text-xs text-slate-500 mb-2">プレイヤー参加用URL</p>
              <div className="bg-slate-100 p-2 rounded text-xs font-mono truncate select-all">
-               {typeof window !== 'undefined' ? window.location.href.replace('role=admin', 'role=player') : ''}
+               {typeof window !== 'undefined' ? `${window.location.origin}/player` : ''}
              </div>
           </div>
 
