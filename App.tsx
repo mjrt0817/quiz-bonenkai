@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useGameCommunication } from './hooks/useGameCommunication';
 import HostScreen from './components/HostScreen';
 import PlayerScreen from './components/PlayerScreen';
@@ -6,20 +6,34 @@ import AdminDashboard from './components/AdminDashboard';
 import { Monitor, Smartphone, Settings } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [role, setRole] = useState<'HOST' | 'PLAYER' | 'ADMIN' | null>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const roleParam = params.get('role');
-    if (roleParam === 'player') return 'PLAYER';
-    if (roleParam === 'host') return 'HOST';
-    if (roleParam === 'admin') return 'ADMIN';
+  // URLパスから役割を判定する関数
+  const getRoleFromPath = (): 'HOST' | 'PLAYER' | 'ADMIN' | null => {
+    const path = window.location.pathname;
+    if (path === '/player' || path.startsWith('/player')) return 'PLAYER';
+    if (path === '/host' || path.startsWith('/host')) return 'HOST';
+    if (path === '/admin' || path.startsWith('/admin')) return 'ADMIN';
     return null;
-  });
+  };
+
+  const [role, setRole] = useState(getRoleFromPath);
   
-  const handleBack = () => {
-    setRole(null);
-    const url = new URL(window.location.href);
-    url.searchParams.delete('role');
-    window.history.replaceState({}, '', url);
+  // ブラウザの戻る/進むボタンに対応
+  useEffect(() => {
+    const handlePopState = () => {
+      setRole(getRoleFromPath());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = (newRole: 'HOST' | 'PLAYER' | 'ADMIN' | null) => {
+    let path = '/';
+    if (newRole === 'HOST') path = '/host';
+    if (newRole === 'PLAYER') path = '/player';
+    if (newRole === 'ADMIN') path = '/admin';
+    
+    window.history.pushState({}, '', path);
+    setRole(newRole);
   };
 
   if (!role) {
@@ -36,7 +50,7 @@ const App: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
           <button 
-            onClick={() => setRole('HOST')}
+            onClick={() => navigate('HOST')}
             className="group relative overflow-hidden p-6 bg-slate-800 hover:bg-slate-700 border-2 border-slate-700 hover:border-indigo-500 rounded-3xl transition-all duration-300 text-left shadow-xl"
           >
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
@@ -52,7 +66,7 @@ const App: React.FC = () => {
           </button>
 
           <button 
-            onClick={() => setRole('ADMIN')}
+            onClick={() => navigate('ADMIN')}
             className="group relative overflow-hidden p-6 bg-slate-800 hover:bg-slate-700 border-2 border-slate-700 hover:border-blue-500 rounded-3xl transition-all duration-300 text-left shadow-xl"
           >
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
@@ -68,7 +82,7 @@ const App: React.FC = () => {
           </button>
 
           <button 
-            onClick={() => setRole('PLAYER')}
+            onClick={() => navigate('PLAYER')}
             className="group relative overflow-hidden p-6 bg-slate-800 hover:bg-slate-700 border-2 border-slate-700 hover:border-pink-500 rounded-3xl transition-all duration-300 text-left shadow-xl"
           >
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
@@ -89,9 +103,9 @@ const App: React.FC = () => {
 
   return (
     <>
-      {role === 'HOST' && <HostApp onBack={handleBack} />}
-      {role === 'ADMIN' && <AdminApp onBack={handleBack} />}
-      {role === 'PLAYER' && <PlayerApp onBack={handleBack} />}
+      {role === 'HOST' && <HostApp onBack={() => navigate(null)} />}
+      {role === 'ADMIN' && <AdminApp onBack={() => navigate(null)} />}
+      {role === 'PLAYER' && <PlayerApp onBack={() => navigate(null)} />}
     </>
   );
 };
