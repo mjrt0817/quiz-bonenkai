@@ -13,10 +13,8 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('role');
-      url.searchParams.set('role', 'player');
-      setPlayerUrl(url.toString());
+      // 現在のドメイン + /player のパスを生成
+      setPlayerUrl(`${window.location.origin}/player`);
     }
   }, []);
 
