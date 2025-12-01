@@ -38,30 +38,33 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   }, []);
 
   // Handler to toggle sound and "unlock" audio context
-  const toggleSound = async () => {
+  // Fixed: Don't block UI if audio fails to load immediately. Just try to unlock.
+  const toggleSound = () => {
     if (!soundEnabled) {
-      try {
-        const unlockAudio = async (ref: React.MutableRefObject<HTMLAudioElement | null>) => {
-            if (ref.current) {
-                ref.current.volume = 0.5;
-                await ref.current.play();
-                ref.current.pause();
-                ref.current.currentTime = 0;
-            }
-        };
-        await Promise.all([
-            unlockAudio(tickingAudioRef),
-            unlockAudio(fanfareAudioRef),
-            unlockAudio(drumrollAudioRef)
-        ]);
-        setSoundEnabled(true);
-        setAudioError(null);
-      } catch (e) {
-        console.error("Audio unlock failed", e);
-        setAudioError("再生できませんでした。");
-      }
+      // Attempt to wake up all audio elements
+      [tickingAudioRef, fanfareAudioRef, drumrollAudioRef].forEach(ref => {
+        if (ref.current) {
+          // Play and immediately pause to unlock AudioContext on mobile/strict browsers
+          ref.current.volume = 0.5;
+          ref.current.play().then(() => {
+             ref.current?.pause();
+             if(ref.current) ref.current.currentTime = 0;
+          }).catch(e => {
+             console.warn("Audio unlock warning (normal if not loaded yet):", e);
+          });
+        }
+      });
+      setSoundEnabled(true);
+      setAudioError(null);
     } else {
       setSoundEnabled(false);
+      // Pause all
+      [tickingAudioRef, fanfareAudioRef, drumrollAudioRef].forEach(ref => {
+        if(ref.current) {
+            ref.current.pause();
+            ref.current.currentTime = 0;
+        }
+      });
     }
   };
 
@@ -89,10 +92,12 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     if (!soundEnabled) return;
 
     // 1. Ticking Sound (Answer Time)
+    // Play only when playing question and time is remaining
     if (state.gameState === GameState.PLAYING_QUESTION && timeLeft > 0.5) {
         if (tickingAudioRef.current && tickingAudioRef.current.paused) {
             tickingAudioRef.current.volume = 0.5;
-            tickingAudioRef.current.play().catch(() => {});
+            tickingAudioRef.current.loop = true;
+            tickingAudioRef.current.play().catch(e => console.warn("Ticking play failed", e));
         }
     } else {
         if (tickingAudioRef.current) {
@@ -117,23 +122,26 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
                 // Play Drumroll
                 if (drumrollAudioRef.current) {
-                    drumrollAudioRef.current.volume = 0.7;
+                    drumrollAudioRef.current.volume = 0.8;
                     drumrollAudioRef.current.currentTime = 0;
-                    drumrollAudioRef.current.play().catch(e => console.error(e));
+                    drumrollAudioRef.current.loop = true; // Loop drumroll during suspense
+                    drumrollAudioRef.current.play().catch(e => console.warn("Drumroll failed", e));
                 }
 
-                // Wait 3 seconds, then Play Fanfare and Show Result
+                // Wait 3.5 seconds, then Stop Drumroll -> Play Fanfare -> Show Result
+                const suspenseTime = 3500;
                 setTimeout(() => {
-                    setIsDrumrolling(false);
                     if (drumrollAudioRef.current) {
                         drumrollAudioRef.current.pause();
+                        drumrollAudioRef.current.currentTime = 0;
                     }
                     if (fanfareAudioRef.current) {
                         fanfareAudioRef.current.volume = 1.0;
                         fanfareAudioRef.current.currentTime = 0;
-                        fanfareAudioRef.current.play().catch(e => console.error(e));
+                        fanfareAudioRef.current.play().catch(e => console.warn("Fanfare failed", e));
                     }
-                }, 3500); // 3.5s Drumroll
+                    setIsDrumrolling(false); // Reveal the visual
+                }, suspenseTime);
             }
         }
         prevRankingStage.current = state.rankingRevealStage;
@@ -158,9 +166,10 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
       
       {/* HIDDEN AUDIO ELEMENTS */}
-      <audio ref={tickingAudioRef} src={AUDIO_SRC.TICKING} loop preload="auto" />
-      <audio ref={fanfareAudioRef} src={AUDIO_SRC.FANFARE} preload="auto" />
-      <audio ref={drumrollAudioRef} src={AUDIO_SRC.DRUMROLL} preload="auto" />
+      {/* Added crossOrigin anonymous to help with some CORS issues */}
+      <audio ref={tickingAudioRef} src={AUDIO_SRC.TICKING} crossOrigin="anonymous" preload="auto" />
+      <audio ref={fanfareAudioRef} src={AUDIO_SRC.FANFARE} crossOrigin="anonymous" preload="auto" />
+      <audio ref={drumrollAudioRef} src={AUDIO_SRC.DRUMROLL} crossOrigin="anonymous" preload="auto" />
 
       {/* HEADER */}
       <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10">
@@ -297,92 +306,67 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
         {/* 4. FINAL RANKING SCREEN (Staged Reveal with Drumroll) */}
         {state.gameState === GameState.FINAL_RESULT && (
-           <div className="absolute inset-0 flex flex-col p-6 bg-slate-900">
-              <div className="text-center mb-6">
-                 <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-amber-600 drop-shadow-sm inline-flex items-center gap-4">
-                    <Trophy size={48} className="text-yellow-500" /> FINAL RANKING
+           <div className="absolute inset-0 flex flex-col p-6 bg-slate-900 items-center justify-center">
+              <div className="text-center mb-10">
+                 <h2 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-amber-600 drop-shadow-sm inline-flex items-center gap-6">
+                    <Trophy size={64} className="text-yellow-500" /> FINAL RANKING
                  </h2>
               </div>
 
-              <div className="flex-1 flex gap-6 max-w-7xl mx-auto w-full">
+              {/* PODIUM ONLY - CENTERED */}
+              <div className="w-full max-w-5xl h-[600px] flex items-end justify-center gap-8 pb-10">
                   
-                  {/* LEFT: 4th Place and below */}
-                  {!state.hideBelowTop3 && (
-                  <div className={`flex-1 bg-slate-800/50 rounded-2xl border border-slate-700 p-4 flex flex-col transition-opacity duration-500 ${state.rankingRevealStage >= 0 ? 'opacity-100' : 'opacity-0'}`}>
-                      <h3 className="text-xl font-bold text-slate-400 mb-4 border-b border-slate-700 pb-2">Result List</h3>
-                      <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                          {sortedPlayers.slice(3).map((p, i) => (
-                             <div key={p.id} className="flex justify-between items-center bg-slate-700/50 p-3 rounded text-lg">
-                                 <div className="flex items-center gap-3">
-                                     <span className="font-mono text-slate-500 w-8 text-right">{i + 4}.</span>
-                                     <span className="font-bold">{p.name}</span>
-                                 </div>
-                                 <div className="font-mono text-indigo-400">{p.score}pts</div>
-                             </div>
-                          ))}
-                          {sortedPlayers.length <= 3 && <p className="text-slate-500 text-center mt-10">No other players</p>}
-                      </div>
+                  {/* 2nd Place */}
+                  <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 2 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
+                     {state.rankingRevealStage === 2 && isDrumrolling ? (
+                       <div className="mb-20 animate-pulse text-6xl font-black text-slate-500">???</div>
+                     ) : (
+                       <>
+                         <div className="mb-4 text-center">
+                             <Medal size={80} className="text-slate-300 mx-auto mb-2" />
+                             <div className="text-3xl font-bold text-slate-300">2nd</div>
+                             <div className="text-4xl font-black truncate max-w-[280px]">{sortedPlayers[1]?.name || '-'}</div>
+                             <div className="font-mono text-2xl text-indigo-400">{sortedPlayers[1]?.score || 0} pts</div>
+                         </div>
+                         <div className="w-full h-[300px] bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-2xl shadow-2xl border-t-8 border-slate-400"></div>
+                       </>
+                     )}
                   </div>
-                  )}
 
-                  {/* RIGHT: TOP 3 PODIUM */}
-                  <div className="flex-[2] flex flex-col justify-end pb-10 relative">
-                      <div className="flex justify-center items-end gap-4 h-[500px]">
-                          
-                          {/* 2nd Place */}
-                          <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 2 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
-                             {state.rankingRevealStage === 2 && isDrumrolling ? (
-                               <div className="mb-20 animate-pulse text-6xl font-black text-slate-500">???</div>
-                             ) : (
-                               <>
-                                 <div className="mb-4 text-center">
-                                     <Medal size={64} className="text-slate-300 mx-auto mb-2" />
-                                     <div className="text-2xl font-bold text-slate-300">2nd</div>
-                                     <div className="text-3xl font-black truncate max-w-[200px]">{sortedPlayers[1]?.name || '-'}</div>
-                                     <div className="font-mono text-xl text-indigo-400">{sortedPlayers[1]?.score || 0} pts</div>
-                                 </div>
-                                 <div className="w-full h-[60%] bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-lg shadow-2xl border-t-4 border-slate-400"></div>
-                               </>
-                             )}
-                          </div>
+                  {/* 1st Place */}
+                  <div className={`w-1/3 flex flex-col justify-end items-center z-10 transition-all duration-700 delay-200 transform ${state.rankingRevealStage >= 3 ? 'translate-y-0 opacity-100 scale-110' : 'translate-y-20 opacity-0'}`}>
+                     {state.rankingRevealStage === 3 && isDrumrolling ? (
+                       <div className="mb-32 animate-bounce text-8xl font-black text-yellow-500">???</div>
+                     ) : (
+                       <>
+                         <div className="mb-4 text-center">
+                             <Trophy size={100} className="text-yellow-400 mx-auto mb-4 animate-bounce-short" />
+                             <div className="text-4xl font-bold text-yellow-400">1st</div>
+                             <div className="text-5xl font-black truncate max-w-[350px] text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{sortedPlayers[0]?.name || '-'}</div>
+                             <div className="font-mono text-4xl text-yellow-200">{sortedPlayers[0]?.score || 0} pts</div>
+                         </div>
+                         <div className="w-full h-[450px] bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-2xl shadow-[0_0_80px_rgba(234,179,8,0.4)] border-t-8 border-yellow-300 relative overflow-hidden">
+                             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
+                         </div>
+                       </>
+                     )}
+                  </div>
 
-                          {/* 1st Place */}
-                          <div className={`w-1/3 flex flex-col justify-end items-center z-10 transition-all duration-700 delay-200 transform ${state.rankingRevealStage >= 3 ? 'translate-y-0 opacity-100 scale-110' : 'translate-y-20 opacity-0'}`}>
-                             {state.rankingRevealStage === 3 && isDrumrolling ? (
-                               <div className="mb-32 animate-bounce text-7xl font-black text-yellow-500">???</div>
-                             ) : (
-                               <>
-                                 <div className="mb-4 text-center">
-                                     <Trophy size={80} className="text-yellow-400 mx-auto mb-2 animate-bounce-short" />
-                                     <div className="text-3xl font-bold text-yellow-400">1st</div>
-                                     <div className="text-4xl font-black truncate max-w-[250px] text-white drop-shadow-md">{sortedPlayers[0]?.name || '-'}</div>
-                                     <div className="font-mono text-2xl text-yellow-200">{sortedPlayers[0]?.score || 0} pts</div>
-                                 </div>
-                                 <div className="w-full h-[80%] bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-lg shadow-[0_0_50px_rgba(234,179,8,0.3)] border-t-4 border-yellow-300 relative overflow-hidden">
-                                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
-                                 </div>
-                               </>
-                             )}
-                          </div>
-
-                          {/* 3rd Place */}
-                          <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 1 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
-                             {state.rankingRevealStage === 1 && isDrumrolling ? (
-                               <div className="mb-10 animate-pulse text-5xl font-black text-amber-700">???</div>
-                             ) : (
-                               <>
-                                 <div className="mb-4 text-center">
-                                     <Medal size={64} className="text-amber-700 mx-auto mb-2" />
-                                     <div className="text-2xl font-bold text-amber-700">3rd</div>
-                                     <div className="text-3xl font-black truncate max-w-[200px]">{sortedPlayers[2]?.name || '-'}</div>
-                                     <div className="font-mono text-xl text-indigo-400">{sortedPlayers[2]?.score || 0} pts</div>
-                                 </div>
-                                 <div className="w-full h-[40%] bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-lg shadow-2xl border-t-4 border-amber-600"></div>
-                               </>
-                             )}
-                          </div>
-
-                      </div>
+                  {/* 3rd Place */}
+                  <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 1 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
+                     {state.rankingRevealStage === 1 && isDrumrolling ? (
+                       <div className="mb-10 animate-pulse text-6xl font-black text-amber-700">???</div>
+                     ) : (
+                       <>
+                         <div className="mb-4 text-center">
+                             <Medal size={80} className="text-amber-700 mx-auto mb-2" />
+                             <div className="text-3xl font-bold text-amber-700">3rd</div>
+                             <div className="text-4xl font-black truncate max-w-[280px]">{sortedPlayers[2]?.name || '-'}</div>
+                             <div className="font-mono text-2xl text-indigo-400">{sortedPlayers[2]?.score || 0} pts</div>
+                         </div>
+                         <div className="w-full h-[200px] bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-2xl shadow-2xl border-t-8 border-amber-600"></div>
+                       </>
+                     )}
                   </div>
               </div>
            </div>
@@ -394,7 +378,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
       <footer className="bg-slate-800 p-2 flex justify-between items-center text-xs text-slate-500 z-10">
         <button 
            onClick={toggleSound}
-           className={`flex items-center gap-2 px-3 py-1 rounded transition ${soundEnabled ? 'bg-green-600 text-white shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}
+           className={`flex items-center gap-2 px-3 py-1 rounded transition border ${soundEnabled ? 'bg-green-600 text-white border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-slate-600'}`}
         >
           {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
           {soundEnabled ? 'SOUND ON' : 'SOUND OFF (Click to Enable)'}
