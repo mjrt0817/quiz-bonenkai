@@ -1,72 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
-import { Users, Trophy, CheckCircle, Sparkles, Monitor, Loader2, Medal, AlertTriangle, Volume2, VolumeX, Music } from 'lucide-react';
+import { Users, Trophy, CheckCircle, Sparkles, Monitor, Medal, AlertTriangle } from 'lucide-react';
 
 interface HostScreenProps {
   state: HostState;
   onBack: () => void;
 }
 
-// Sound Assets
-const AUDIO_SRC = {
-  TICKING: "https://actions.google.com/sounds/v1/alarms/mechanical_clock_ticking.ogg",
-  FANFARE: "https://actions.google.com/sounds/v1/crowds/battle_crowd_celebrate_stutter.ogg",
-  DRUMROLL: "https://upload.wikimedia.org/wikipedia/commons/e/e9/Drum_roll.ogg"
-};
-
 const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [playerUrl, setPlayerUrl] = useState('');
   
-  // Sound State
-  const [soundEnabled, setSoundEnabled] = useState(false);
-  const [audioError, setAudioError] = useState<string | null>(null);
-  
-  // Ranking Reveal State
-  const [isDrumrolling, setIsDrumrolling] = useState(false);
-  const prevRankingStage = useRef(state.rankingRevealStage);
-  
-  // Refs for Audio Elements
-  const tickingAudioRef = useRef<HTMLAudioElement | null>(null);
-  const fanfareAudioRef = useRef<HTMLAudioElement | null>(null);
-  const drumrollAudioRef = useRef<HTMLAudioElement | null>(null);
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setPlayerUrl(`${window.location.origin}/player`);
     }
   }, []);
-
-  // Handler to toggle sound and "unlock" audio context
-  // Fixed: Don't block UI if audio fails to load immediately. Just try to unlock.
-  const toggleSound = () => {
-    if (!soundEnabled) {
-      // Attempt to wake up all audio elements
-      [tickingAudioRef, fanfareAudioRef, drumrollAudioRef].forEach(ref => {
-        if (ref.current) {
-          // Play and immediately pause to unlock AudioContext on mobile/strict browsers
-          ref.current.volume = 0.5;
-          ref.current.play().then(() => {
-             ref.current?.pause();
-             if(ref.current) ref.current.currentTime = 0;
-          }).catch(e => {
-             console.warn("Audio unlock warning (normal if not loaded yet):", e);
-          });
-        }
-      });
-      setSoundEnabled(true);
-      setAudioError(null);
-    } else {
-      setSoundEnabled(false);
-      // Pause all
-      [tickingAudioRef, fanfareAudioRef, drumrollAudioRef].forEach(ref => {
-        if(ref.current) {
-            ref.current.pause();
-            ref.current.currentTime = 0;
-        }
-      });
-    }
-  };
 
   // Visual Timer Logic
   useEffect(() => {
@@ -86,73 +35,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     };
   }, [state.gameState, state.questionStartTime, state.timeLimit]);
 
-  // --- SOUND & ANIMATION LOGIC ---
-  
-  useEffect(() => {
-    if (!soundEnabled) return;
-
-    // 1. Ticking Sound (Answer Time)
-    // Play only when playing question and time is remaining
-    if (state.gameState === GameState.PLAYING_QUESTION && timeLeft > 0.5) {
-        if (tickingAudioRef.current && tickingAudioRef.current.paused) {
-            tickingAudioRef.current.volume = 0.5;
-            tickingAudioRef.current.loop = true;
-            tickingAudioRef.current.play().catch(e => console.warn("Ticking play failed", e));
-        }
-    } else {
-        if (tickingAudioRef.current) {
-            tickingAudioRef.current.pause();
-            tickingAudioRef.current.currentTime = 0;
-        }
-    }
-
-    // 2. Ranking Reveal (Drumroll -> Fanfare)
-    if (state.gameState === GameState.FINAL_RESULT) {
-        // Detect stage change
-        if (state.rankingRevealStage > prevRankingStage.current) {
-            // Only play effects for top 3 (Stages 1, 2, 3)
-            if (state.rankingRevealStage >= 1) {
-                setIsDrumrolling(true);
-                
-                // Stop Fanfare if playing
-                if (fanfareAudioRef.current) {
-                    fanfareAudioRef.current.pause();
-                    fanfareAudioRef.current.currentTime = 0;
-                }
-
-                // Play Drumroll
-                if (drumrollAudioRef.current) {
-                    drumrollAudioRef.current.volume = 0.8;
-                    drumrollAudioRef.current.currentTime = 0;
-                    drumrollAudioRef.current.loop = true; // Loop drumroll during suspense
-                    drumrollAudioRef.current.play().catch(e => console.warn("Drumroll failed", e));
-                }
-
-                // Wait 3.5 seconds, then Stop Drumroll -> Play Fanfare -> Show Result
-                const suspenseTime = 3500;
-                setTimeout(() => {
-                    if (drumrollAudioRef.current) {
-                        drumrollAudioRef.current.pause();
-                        drumrollAudioRef.current.currentTime = 0;
-                    }
-                    if (fanfareAudioRef.current) {
-                        fanfareAudioRef.current.volume = 1.0;
-                        fanfareAudioRef.current.currentTime = 0;
-                        fanfareAudioRef.current.play().catch(e => console.warn("Fanfare failed", e));
-                    }
-                    setIsDrumrolling(false); // Reveal the visual
-                }, suspenseTime);
-            }
-        }
-        prevRankingStage.current = state.rankingRevealStage;
-    } else {
-        prevRankingStage.current = 0;
-        setIsDrumrolling(false);
-    }
-
-  }, [state.gameState, state.rankingRevealStage, timeLeft, soundEnabled]);
-
-
   // Helper for Final Question
   const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
@@ -165,12 +47,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   return (
     <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
       
-      {/* HIDDEN AUDIO ELEMENTS */}
-      {/* Added crossOrigin anonymous to help with some CORS issues */}
-      <audio ref={tickingAudioRef} src={AUDIO_SRC.TICKING} crossOrigin="anonymous" preload="auto" />
-      <audio ref={fanfareAudioRef} src={AUDIO_SRC.FANFARE} crossOrigin="anonymous" preload="auto" />
-      <audio ref={drumrollAudioRef} src={AUDIO_SRC.DRUMROLL} crossOrigin="anonymous" preload="auto" />
-
       {/* HEADER */}
       <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10">
         <div className="flex items-center gap-4">
@@ -186,7 +62,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
         {/* FINAL QUESTION BANNER */}
         {state.gameState === GameState.PLAYING_QUESTION && isFinalQuestion && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-8 py-2 rounded-full font-black text-xl animate-pulse shadow-[0_0_20px_rgba(220,38,38,0.6)] flex items-center gap-2 border-2 border-white">
-                <AlertTriangle /> 最終問題 <AlertTriangle />
+                <AlertTriangle /> ⚠️ 最終問題 ⚠️ <AlertTriangle />
             </div>
         )}
 
@@ -304,7 +180,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
            </div>
         )}
 
-        {/* 4. FINAL RANKING SCREEN (Staged Reveal with Drumroll) */}
+        {/* 4. FINAL RANKING SCREEN (Staged Reveal with Manual Control) */}
         {state.gameState === GameState.FINAL_RESULT && (
            <div className="absolute inset-0 flex flex-col p-6 bg-slate-900 items-center justify-center">
               <div className="text-center mb-10">
@@ -318,7 +194,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                   
                   {/* 2nd Place */}
                   <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 2 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
-                     {state.rankingRevealStage === 2 && isDrumrolling ? (
+                     {state.rankingRevealStage === 2 && !state.isRankingResultVisible ? (
                        <div className="mb-20 animate-pulse text-6xl font-black text-slate-500">???</div>
                      ) : (
                        <>
@@ -335,7 +211,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
                   {/* 1st Place */}
                   <div className={`w-1/3 flex flex-col justify-end items-center z-10 transition-all duration-700 delay-200 transform ${state.rankingRevealStage >= 3 ? 'translate-y-0 opacity-100 scale-110' : 'translate-y-20 opacity-0'}`}>
-                     {state.rankingRevealStage === 3 && isDrumrolling ? (
+                     {state.rankingRevealStage === 3 && !state.isRankingResultVisible ? (
                        <div className="mb-32 animate-bounce text-8xl font-black text-yellow-500">???</div>
                      ) : (
                        <>
@@ -354,7 +230,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
                   {/* 3rd Place */}
                   <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 1 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
-                     {state.rankingRevealStage === 1 && isDrumrolling ? (
+                     {state.rankingRevealStage === 1 && !state.isRankingResultVisible ? (
                        <div className="mb-10 animate-pulse text-6xl font-black text-amber-700">???</div>
                      ) : (
                        <>
@@ -376,14 +252,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
       {/* FOOTER CONTROLS */}
       <footer className="bg-slate-800 p-2 flex justify-between items-center text-xs text-slate-500 z-10">
-        <button 
-           onClick={toggleSound}
-           className={`flex items-center gap-2 px-3 py-1 rounded transition border ${soundEnabled ? 'bg-green-600 text-white border-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-slate-600'}`}
-        >
-          {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
-          {soundEnabled ? 'SOUND ON' : 'SOUND OFF (Click to Enable)'}
-        </button>
-        {audioError && <span className="text-red-400 font-bold animate-pulse">{audioError}</span>}
         <div className="flex gap-4">
            <span>Room: {state.roomCode}</span>
            <button onClick={onBack} className="hover:text-white">Exit Viewer</button>
