@@ -14,6 +14,7 @@ const INITIAL_HOST_STATE: HostState = {
   timeLimit: 20,
   questionStartTime: null,
   rankingRevealStage: 0,
+  isRankingResultVisible: false,
   hideBelowTop3: false,
   quizTitle: 'クイズ大会',
 };
