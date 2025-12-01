@@ -1,20 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
-import { Users, Trophy, CheckCircle, Sparkles, QrCode, Clock, Monitor, Loader2, Medal, AlertTriangle } from 'lucide-react';
+import { Users, Trophy, CheckCircle, Sparkles, QrCode, Clock, Monitor, Loader2, Medal, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
 
 interface HostScreenProps {
   state: HostState;
   onBack: () => void;
 }
 
+// Sound Assets (Google Actions Sound Library - Free to use)
+const AUDIO_SRC = {
+  TICKING: "https://actions.google.com/sounds/v1/alarms/mechanical_clock_ticking.ogg",
+  FANFARE: "https://actions.google.com/sounds/v1/crowds/battle_crowd_celebrate_stutter.ogg"
+};
+
 const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   const [timeLeft, setTimeLeft] = useState(0);
   const [playerUrl, setPlayerUrl] = useState('');
+  
+  // Sound State
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const tickingAudioRef = useRef<HTMLAudioElement | null>(null);
+  const fanfareAudioRef = useRef<HTMLAudioElement | null>(null);
+  const prevRankingStage = useRef(state.rankingRevealStage);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // 現在のドメイン + /player のパスを生成
       setPlayerUrl(`${window.location.origin}/player`);
+      
+      // Initialize Audio Objects
+      tickingAudioRef.current = new Audio(AUDIO_SRC.TICKING);
+      tickingAudioRef.current.loop = true;
+      tickingAudioRef.current.volume = 0.5;
+
+      fanfareAudioRef.current = new Audio(AUDIO_SRC.FANFARE);
+      fanfareAudioRef.current.volume = 0.8;
     }
   }, []);
 
@@ -36,20 +55,49 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     };
   }, [state.gameState, state.questionStartTime, state.timeLimit]);
 
+  // --- SOUND LOGIC ---
+  
+  // 1. Ticking Sound during Question
+  useEffect(() => {
+    const audio = tickingAudioRef.current;
+    if (!audio) return;
+
+    if (soundEnabled && state.gameState === GameState.PLAYING_QUESTION && timeLeft > 0) {
+        audio.play().catch(e => console.warn("Audio play blocked", e));
+    } else {
+        audio.pause();
+        audio.currentTime = 0;
+    }
+  }, [state.gameState, soundEnabled, timeLeft > 0]);
+
+  // 2. Fanfare Sound during Ranking Reveal
+  useEffect(() => {
+    const audio = fanfareAudioRef.current;
+    if (!audio || !soundEnabled) return;
+
+    // Play sound when stage increases (0->1, 1->2, 2->3) in FINAL_RESULT
+    if (state.gameState === GameState.FINAL_RESULT) {
+        if (state.rankingRevealStage > prevRankingStage.current) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.warn("Audio play blocked", e));
+        }
+    }
+    prevRankingStage.current = state.rankingRevealStage;
+  }, [state.rankingRevealStage, state.gameState, soundEnabled]);
+
+
   const answerCount = state.players.filter(p => p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
   const totalPlayers = state.players.length;
-  // Safety check for current question
   const currentQ = state.questions && state.questions[state.currentQuestionIndex] 
     ? state.questions[state.currentQuestionIndex] 
     : { text: "Loading...", options: [], correctIndex: 0, explanation: "" };
 
   const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
-  // --- 1. SETUP MODE (Waiting for Admin) ---
+  // --- 1. SETUP MODE ---
   if (state.gameState === GameState.SETUP) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-slate-950 text-white p-6 relative overflow-hidden">
-        {/* Background Animation */}
         <div className="absolute inset-0 overflow-hidden opacity-20 pointer-events-none">
            <div className="absolute top-10 left-10 w-64 h-64 bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"></div>
            <div className="absolute bottom-10 right-10 w-64 h-64 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl animate-pulse animation-delay-2000"></div>
@@ -77,7 +125,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     return (
       <div className="flex flex-col h-screen bg-slate-900 text-white">
         <main className="flex-1 flex flex-col items-center p-6 text-center relative overflow-hidden">
-          {/* Top Section: Info & QR */}
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16 mb-6 z-10 shrink-0">
             <div className="text-left space-y-4">
                <div>
@@ -101,7 +148,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                </div>
             </div>
 
-            {/* QR Code */}
             <div className="p-4 bg-white rounded-3xl shadow-[0_0_50px_rgba(255,255,255,0.1)] transform rotate-2">
                <div className="w-48 h-48 bg-slate-100 flex flex-col items-center justify-center overflow-hidden rounded-xl">
                  {playerUrl ? (
@@ -120,7 +166,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
             </div>
           </div>
 
-          {/* Player List Area (Scrollable for 100+ users) */}
           <div className="w-full max-w-7xl flex-1 flex flex-col min-h-0 bg-slate-900/50 rounded-t-2xl border-t border-slate-800 p-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-4 shrink-0">
               <h3 className="text-xl font-bold text-slate-400">
@@ -149,8 +194,19 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
   // --- 3. GAME SCREEN ---
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-slate-950 text-white overflow-hidden relative">
       
+      {/* Sound Toggle Button (Bottom Left) */}
+      <div className="absolute bottom-4 left-4 z-50">
+        <button 
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`p-3 rounded-full shadow-lg border transition-all ${soundEnabled ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
+            title={soundEnabled ? "Sound ON" : "Sound OFF (Click to Enable)"}
+        >
+            {soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
+        </button>
+      </div>
+
       {/* Top Bar */}
       <header className="bg-slate-900 p-6 flex justify-between items-center border-b border-slate-800 shadow-lg relative z-20">
         <div className="flex items-center gap-6">
@@ -212,7 +268,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
              <div className="w-full grid grid-cols-1 gap-4 justify-items-center">
                {/* Logic for Ranking Reveal Stages */}
                {(() => {
-                   // Sort: Score Desc -> Time Asc
                    const sorted = [...state.players].sort((a, b) => {
                         if (b.score !== a.score) return b.score - a.score;
                         const timeA = a.totalResponseTime || 0;
@@ -224,7 +279,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                    const second = sorted[1];
                    const third = sorted[2];
                    const others = sorted.slice(3);
-                   const stage = state.rankingRevealStage; // 0, 1, 2, 3
+                   const stage = state.rankingRevealStage;
 
                    return (
                        <div className="w-full max-w-5xl flex flex-col items-center gap-8">
@@ -262,7 +317,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                                )}
                            </div>
 
-                           {/* Stage 0: Others (Grid) - Hidden if hideBelowTop3 is true */}
+                           {/* Stage 0: Others */}
                            {stage >= 0 && others.length > 0 && !state.hideBelowTop3 && (
                                <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 opacity-80 animate-in fade-in duration-500">
                                    {others.slice(0, 16).map((p, i) => (
