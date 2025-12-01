@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -53,6 +53,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         gameState: GameState.LOBBY,
         currentQuestionIndex: 0,
         rankingRevealStage: 0,
+        isRankingResultVisible: false,
         hideBelowTop3: false,
         quizTitle: titleInput
       }));
@@ -72,7 +73,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       gameState: GameState.PLAYING_QUESTION,
       questionStartTime: Date.now(),
       timeLimit: 20,
-      rankingRevealStage: 0
+      rankingRevealStage: 0,
+      isRankingResultVisible: false
     }));
   };
 
@@ -96,7 +98,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         return { 
             ...prev, 
             gameState: GameState.FINAL_RESULT,
-            rankingRevealStage: 0 // Start with stage 0 (4th place and below)
+            rankingRevealStage: 0, // Start with stage 0 (4th place and below)
+            isRankingResultVisible: false
         };
       }
       return {
@@ -108,11 +111,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   };
 
-  const nextRankingStage = () => {
-      updateState(prev => {
-          const nextStage = prev.rankingRevealStage + 1;
-          return { ...prev, rankingRevealStage: nextStage };
-      });
+  // Move to next stage (Prepare/Suspense phase)
+  const goToStage = (stage: number) => {
+      updateState(prev => ({ 
+          ...prev, 
+          rankingRevealStage: stage, 
+          isRankingResultVisible: false 
+      }));
+  };
+
+  // Reveal current stage (Open phase)
+  const revealStage = () => {
+      updateState(prev => ({ ...prev, isRankingResultVisible: true }));
   };
   
   const toggleHideBelowTop3 = () => {
@@ -125,6 +135,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       gameState: GameState.SETUP,
       questions: [],
       rankingRevealStage: 0,
+      isRankingResultVisible: false,
       hideBelowTop3: false
     }));
     setStatusMsg('ゲームをリセットしました');
@@ -138,6 +149,64 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     : { text: "", options: [] };
 
   const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
+
+  // Logic to determine which ranking button to show
+  const renderRankingControl = () => {
+      const stage = state.rankingRevealStage;
+      const visible = state.isRankingResultVisible;
+
+      if (stage === 0) {
+          // Initial state: "Prepare 3rd Place"
+          return (
+             <button onClick={() => goToStage(1)} className="w-full bg-amber-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-amber-700 flex items-center justify-center gap-2">
+                 <Medal size={24}/> 3位の発表準備 (READY)
+             </button>
+          );
+      } else if (stage === 1) {
+          if (!visible) {
+              return (
+                 <button onClick={revealStage} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700 flex items-center justify-center gap-2 animate-pulse">
+                     <Unlock size={24}/> 3位をオープン (OPEN)
+                 </button>
+              );
+          } else {
+              return (
+                 <button onClick={() => goToStage(2)} className="w-full bg-slate-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-slate-700 flex items-center justify-center gap-2">
+                     <Medal size={24}/> 2位の発表準備 (READY)
+                 </button>
+              );
+          }
+      } else if (stage === 2) {
+          if (!visible) {
+              return (
+                 <button onClick={revealStage} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700 flex items-center justify-center gap-2 animate-pulse">
+                     <Unlock size={24}/> 2位をオープン (OPEN)
+                 </button>
+              );
+          } else {
+              return (
+                 <button onClick={() => goToStage(3)} className="w-full bg-yellow-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-yellow-700 flex items-center justify-center gap-2">
+                     <Trophy size={24}/> 優勝者の発表準備 (READY)
+                 </button>
+              );
+          }
+      } else if (stage === 3) {
+          if (!visible) {
+               return (
+                 <button onClick={revealStage} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700 flex items-center justify-center gap-2 animate-pulse">
+                     <Unlock size={24}/> 優勝者をオープン (OPEN)
+                 </button>
+              );
+          } else {
+              return (
+                 <button disabled className="w-full bg-slate-300 text-slate-500 py-4 rounded-lg font-bold text-xl shadow flex items-center justify-center gap-2">
+                     発表終了
+                 </button>
+              );
+          }
+      }
+      return null;
+  };
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
@@ -271,19 +340,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                              state.rankingRevealStage === 1 ? '3位発表' : 
                              state.rankingRevealStage === 2 ? '2位発表' : '1位発表'}
                         </span>
+                        <div className="mt-1 text-xs">
+                            State: <span className={`font-bold ${state.isRankingResultVisible ? 'text-green-600' : 'text-slate-500'}`}>{state.isRankingResultVisible ? 'OPEN' : 'SUSPENSE'}</span>
+                        </div>
                     </div>
                     
-                    {state.rankingRevealStage < 3 ? (
-                        <button onClick={nextRankingStage} className="w-full bg-yellow-500 text-white py-3 rounded shadow hover:bg-yellow-600 font-bold flex items-center justify-center gap-2">
-                            <Medal size={20}/> 
-                            {state.rankingRevealStage === 0 ? '3位を発表' : 
-                             state.rankingRevealStage === 1 ? '2位を発表' : '優勝者を発表'}
-                        </button>
-                    ) : (
-                        <button disabled className="w-full bg-slate-300 text-slate-500 py-3 rounded font-bold">
-                            発表終了
-                        </button>
-                    )}
+                    {renderRankingControl()}
                   </div>
                 )}
               </div>
