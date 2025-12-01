@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
-import { Users, Trophy, CheckCircle, Sparkles, Clock, Monitor, Loader2, Medal, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
+import { Users, Trophy, CheckCircle, Sparkles, Monitor, Loader2, Medal, AlertTriangle, Volume2, VolumeX, Music } from 'lucide-react';
 
 interface HostScreenProps {
   state: HostState;
   onBack: () => void;
 }
 
-// Sound Assets (Google Actions Sound Library - Free to use)
+// Sound Assets
 const AUDIO_SRC = {
   TICKING: "https://actions.google.com/sounds/v1/alarms/mechanical_clock_ticking.ogg",
-  FANFARE: "https://actions.google.com/sounds/v1/crowds/battle_crowd_celebrate_stutter.ogg"
+  FANFARE: "https://actions.google.com/sounds/v1/crowds/battle_crowd_celebrate_stutter.ogg",
+  DRUMROLL: "https://upload.wikimedia.org/wikipedia/commons/e/e9/Drum_roll.ogg"
 };
 
 const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
@@ -21,10 +22,14 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   
+  // Ranking Reveal State
+  const [isDrumrolling, setIsDrumrolling] = useState(false);
+  const prevRankingStage = useRef(state.rankingRevealStage);
+  
   // Refs for Audio Elements
   const tickingAudioRef = useRef<HTMLAudioElement | null>(null);
   const fanfareAudioRef = useRef<HTMLAudioElement | null>(null);
-  const prevRankingStage = useRef(state.rankingRevealStage);
+  const drumrollAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -35,31 +40,27 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   // Handler to toggle sound and "unlock" audio context
   const toggleSound = async () => {
     if (!soundEnabled) {
-      // Trying to enable sound
-      // We must interact with the elements to unlock autoplay
       try {
-        if (tickingAudioRef.current) {
-            tickingAudioRef.current.volume = 0.5;
-            // Play briefly then pause to unlock
-            await tickingAudioRef.current.play();
-            tickingAudioRef.current.pause();
-        }
-        if (fanfareAudioRef.current) {
-            fanfareAudioRef.current.volume = 0.8;
-            await fanfareAudioRef.current.play();
-            fanfareAudioRef.current.pause();
-            fanfareAudioRef.current.currentTime = 0;
-        }
+        const unlockAudio = async (ref: React.MutableRefObject<HTMLAudioElement | null>) => {
+            if (ref.current) {
+                ref.current.volume = 0.5;
+                await ref.current.play();
+                ref.current.pause();
+                ref.current.currentTime = 0;
+            }
+        };
+        await Promise.all([
+            unlockAudio(tickingAudioRef),
+            unlockAudio(fanfareAudioRef),
+            unlockAudio(drumrollAudioRef)
+        ]);
         setSoundEnabled(true);
         setAudioError(null);
       } catch (e) {
         console.error("Audio unlock failed", e);
-        setAudioError("再生できませんでした。ブラウザ設定を確認してください。");
+        setAudioError("再生できませんでした。");
       }
     } else {
-      // Disable sound
-      if (tickingAudioRef.current) tickingAudioRef.current.pause();
-      if (fanfareAudioRef.current) fanfareAudioRef.current.pause();
       setSoundEnabled(false);
     }
   };
@@ -82,16 +83,15 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     };
   }, [state.gameState, state.questionStartTime, state.timeLimit]);
 
-  // --- SOUND LOGIC ---
+  // --- SOUND & ANIMATION LOGIC ---
   
   useEffect(() => {
     if (!soundEnabled) return;
 
-    // 1. Ticking
-    // Play only during question time and when time is remaining
-    if (state.gameState === GameState.PLAYING_QUESTION && timeLeft > 0) {
-        // Prevent constant play() calls if already playing
+    // 1. Ticking Sound (Answer Time)
+    if (state.gameState === GameState.PLAYING_QUESTION && timeLeft > 0.5) {
         if (tickingAudioRef.current && tickingAudioRef.current.paused) {
+            tickingAudioRef.current.volume = 0.5;
             tickingAudioRef.current.play().catch(() => {});
         }
     } else {
@@ -101,18 +101,45 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
         }
     }
 
-    // 2. Fanfare
-    // Play when ranking stage increments
+    // 2. Ranking Reveal (Drumroll -> Fanfare)
     if (state.gameState === GameState.FINAL_RESULT) {
+        // Detect stage change
         if (state.rankingRevealStage > prevRankingStage.current) {
-            if (fanfareAudioRef.current) {
-                fanfareAudioRef.current.currentTime = 0;
-                fanfareAudioRef.current.play().catch(() => {});
+            // Only play effects for top 3 (Stages 1, 2, 3)
+            if (state.rankingRevealStage >= 1) {
+                setIsDrumrolling(true);
+                
+                // Stop Fanfare if playing
+                if (fanfareAudioRef.current) {
+                    fanfareAudioRef.current.pause();
+                    fanfareAudioRef.current.currentTime = 0;
+                }
+
+                // Play Drumroll
+                if (drumrollAudioRef.current) {
+                    drumrollAudioRef.current.volume = 0.7;
+                    drumrollAudioRef.current.currentTime = 0;
+                    drumrollAudioRef.current.play().catch(e => console.error(e));
+                }
+
+                // Wait 3 seconds, then Play Fanfare and Show Result
+                setTimeout(() => {
+                    setIsDrumrolling(false);
+                    if (drumrollAudioRef.current) {
+                        drumrollAudioRef.current.pause();
+                    }
+                    if (fanfareAudioRef.current) {
+                        fanfareAudioRef.current.volume = 1.0;
+                        fanfareAudioRef.current.currentTime = 0;
+                        fanfareAudioRef.current.play().catch(e => console.error(e));
+                    }
+                }, 3500); // 3.5s Drumroll
             }
         }
         prevRankingStage.current = state.rankingRevealStage;
     } else {
-        prevRankingStage.current = 0; // Reset tracking
+        prevRankingStage.current = 0;
+        setIsDrumrolling(false);
     }
 
   }, [state.gameState, state.rankingRevealStage, timeLeft, soundEnabled]);
@@ -121,6 +148,11 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   // Helper for Final Question
   const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
+  // Sorted Players for Ranking
+  const sortedPlayers = [...state.players].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return (a.totalResponseTime || 0) - (b.totalResponseTime || 0);
+  });
 
   return (
     <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
@@ -128,6 +160,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
       {/* HIDDEN AUDIO ELEMENTS */}
       <audio ref={tickingAudioRef} src={AUDIO_SRC.TICKING} loop preload="auto" />
       <audio ref={fanfareAudioRef} src={AUDIO_SRC.FANFARE} preload="auto" />
+      <audio ref={drumrollAudioRef} src={AUDIO_SRC.DRUMROLL} preload="auto" />
 
       {/* HEADER */}
       <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10">
@@ -163,7 +196,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
       {/* MAIN CONTENT */}
       <main className="flex-1 relative flex flex-col">
         
-        {/* 1. LOBBY SCREEN (100 Players Optimized) */}
+        {/* 1. LOBBY SCREEN */}
         {(state.gameState === GameState.SETUP || state.gameState === GameState.LOBBY) && (
           <div className="absolute inset-0 flex flex-col items-center justify-start pt-10 p-6">
             <h2 className="text-4xl md:text-5xl font-black mb-4 text-center text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
@@ -186,7 +219,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
               </div>
             </div>
 
-            {/* Scrollable Player Grid for 100+ players */}
             <div className="w-full max-w-6xl flex-1 bg-slate-800/30 rounded-2xl border border-slate-700 p-4 overflow-hidden flex flex-col">
                <h3 className="text-lg font-bold text-slate-400 mb-4 flex items-center gap-2">
                  <Users size={20}/> エントリー済み ({state.players.length}名)
@@ -198,11 +230,8 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                       <span className="font-bold text-sm truncate">{player.name}</span>
                     </div>
                   ))}
-                  {/* Empty placeholders if few players */}
                   {state.players.length === 0 && (
-                      <p className="col-span-full text-center text-slate-500 py-10">
-                        待機中...
-                      </p>
+                      <p className="col-span-full text-center text-slate-500 py-10">待機中...</p>
                   )}
                </div>
             </div>
@@ -243,11 +272,10 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
           </div>
         )}
 
-        {/* 3. QUESTION RESULT SCREEN */}
+        {/* 3. RESULT SCREEN */}
         {state.gameState === GameState.PLAYING_RESULT && state.questions[state.currentQuestionIndex] && (
            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-slate-900">
               <h2 className="text-3xl font-bold text-slate-400 mb-8 uppercase tracking-widest">Correct Answer</h2>
-              
               <div className="bg-green-600 text-white p-12 rounded-3xl shadow-[0_0_50px_rgba(22,163,74,0.5)] flex flex-col items-center max-w-4xl w-full animate-in zoom-in duration-500 border-4 border-green-400">
                  <CheckCircle size={80} className="mb-6" />
                  <div className="text-5xl font-black text-center mb-4">
@@ -267,7 +295,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
            </div>
         )}
 
-        {/* 4. FINAL RANKING SCREEN (Staged Reveal) */}
+        {/* 4. FINAL RANKING SCREEN (Staged Reveal with Drumroll) */}
         {state.gameState === GameState.FINAL_RESULT && (
            <div className="absolute inset-0 flex flex-col p-6 bg-slate-900">
               <div className="text-center mb-6">
@@ -276,21 +304,14 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                  </h2>
               </div>
 
-              {/* Ranking Grid */}
               <div className="flex-1 flex gap-6 max-w-7xl mx-auto w-full">
                   
-                  {/* LEFT: 4th Place and below (Scrollable) */}
+                  {/* LEFT: 4th Place and below */}
                   {!state.hideBelowTop3 && (
                   <div className={`flex-1 bg-slate-800/50 rounded-2xl border border-slate-700 p-4 flex flex-col transition-opacity duration-500 ${state.rankingRevealStage >= 0 ? 'opacity-100' : 'opacity-0'}`}>
                       <h3 className="text-xl font-bold text-slate-400 mb-4 border-b border-slate-700 pb-2">Result List</h3>
                       <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                          {[...state.players]
-                             .sort((a, b) => {
-                                 if (b.score !== a.score) return b.score - a.score;
-                                 return (a.totalResponseTime || 0) - (b.totalResponseTime || 0);
-                             })
-                             .slice(3) // Skip top 3
-                             .map((p, i) => (
+                          {sortedPlayers.slice(3).map((p, i) => (
                              <div key={p.id} className="flex justify-between items-center bg-slate-700/50 p-3 rounded text-lg">
                                  <div className="flex items-center gap-3">
                                      <span className="font-mono text-slate-500 w-8 text-right">{i + 4}.</span>
@@ -299,7 +320,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                                  <div className="font-mono text-indigo-400">{p.score}pts</div>
                              </div>
                           ))}
-                          {state.players.length <= 3 && <p className="text-slate-500 text-center mt-10">No other players</p>}
+                          {sortedPlayers.length <= 3 && <p className="text-slate-500 text-center mt-10">No other players</p>}
                       </div>
                   </div>
                   )}
@@ -310,49 +331,55 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                           
                           {/* 2nd Place */}
                           <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 2 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
-                             <div className="mb-4 text-center">
-                                 <Medal size={64} className="text-slate-300 mx-auto mb-2" />
-                                 <div className="text-2xl font-bold text-slate-300">2nd</div>
-                                 <div className="text-3xl font-black truncate max-w-[200px]">
-                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[1]?.name || '-'}
+                             {state.rankingRevealStage === 2 && isDrumrolling ? (
+                               <div className="mb-20 animate-pulse text-6xl font-black text-slate-500">???</div>
+                             ) : (
+                               <>
+                                 <div className="mb-4 text-center">
+                                     <Medal size={64} className="text-slate-300 mx-auto mb-2" />
+                                     <div className="text-2xl font-bold text-slate-300">2nd</div>
+                                     <div className="text-3xl font-black truncate max-w-[200px]">{sortedPlayers[1]?.name || '-'}</div>
+                                     <div className="font-mono text-xl text-indigo-400">{sortedPlayers[1]?.score || 0} pts</div>
                                  </div>
-                                 <div className="font-mono text-xl text-indigo-400">
-                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[1]?.score || 0} pts
-                                 </div>
-                             </div>
-                             <div className="w-full h-[60%] bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-lg shadow-2xl border-t-4 border-slate-400"></div>
+                                 <div className="w-full h-[60%] bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-lg shadow-2xl border-t-4 border-slate-400"></div>
+                               </>
+                             )}
                           </div>
 
                           {/* 1st Place */}
                           <div className={`w-1/3 flex flex-col justify-end items-center z-10 transition-all duration-700 delay-200 transform ${state.rankingRevealStage >= 3 ? 'translate-y-0 opacity-100 scale-110' : 'translate-y-20 opacity-0'}`}>
-                             <div className="mb-4 text-center">
-                                 <Trophy size={80} className="text-yellow-400 mx-auto mb-2 animate-bounce-short" />
-                                 <div className="text-3xl font-bold text-yellow-400">1st</div>
-                                 <div className="text-4xl font-black truncate max-w-[250px] text-white drop-shadow-md">
-                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[0]?.name || '-'}
+                             {state.rankingRevealStage === 3 && isDrumrolling ? (
+                               <div className="mb-32 animate-bounce text-7xl font-black text-yellow-500">???</div>
+                             ) : (
+                               <>
+                                 <div className="mb-4 text-center">
+                                     <Trophy size={80} className="text-yellow-400 mx-auto mb-2 animate-bounce-short" />
+                                     <div className="text-3xl font-bold text-yellow-400">1st</div>
+                                     <div className="text-4xl font-black truncate max-w-[250px] text-white drop-shadow-md">{sortedPlayers[0]?.name || '-'}</div>
+                                     <div className="font-mono text-2xl text-yellow-200">{sortedPlayers[0]?.score || 0} pts</div>
                                  </div>
-                                 <div className="font-mono text-2xl text-yellow-200">
-                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[0]?.score || 0} pts
+                                 <div className="w-full h-[80%] bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-lg shadow-[0_0_50px_rgba(234,179,8,0.3)] border-t-4 border-yellow-300 relative overflow-hidden">
+                                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
                                  </div>
-                             </div>
-                             <div className="w-full h-[80%] bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-lg shadow-[0_0_50px_rgba(234,179,8,0.3)] border-t-4 border-yellow-300 relative overflow-hidden">
-                                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
-                             </div>
+                               </>
+                             )}
                           </div>
 
                           {/* 3rd Place */}
                           <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 1 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
-                             <div className="mb-4 text-center">
-                                 <Medal size={64} className="text-amber-700 mx-auto mb-2" />
-                                 <div className="text-2xl font-bold text-amber-700">3rd</div>
-                                 <div className="text-3xl font-black truncate max-w-[200px]">
-                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[2]?.name || '-'}
+                             {state.rankingRevealStage === 1 && isDrumrolling ? (
+                               <div className="mb-10 animate-pulse text-5xl font-black text-amber-700">???</div>
+                             ) : (
+                               <>
+                                 <div className="mb-4 text-center">
+                                     <Medal size={64} className="text-amber-700 mx-auto mb-2" />
+                                     <div className="text-2xl font-bold text-amber-700">3rd</div>
+                                     <div className="text-3xl font-black truncate max-w-[200px]">{sortedPlayers[2]?.name || '-'}</div>
+                                     <div className="font-mono text-xl text-indigo-400">{sortedPlayers[2]?.score || 0} pts</div>
                                  </div>
-                                 <div className="font-mono text-xl text-indigo-400">
-                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[2]?.score || 0} pts
-                                 </div>
-                             </div>
-                             <div className="w-full h-[40%] bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-lg shadow-2xl border-t-4 border-amber-600"></div>
+                                 <div className="w-full h-[40%] bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-lg shadow-2xl border-t-4 border-amber-600"></div>
+                               </>
+                             )}
                           </div>
 
                       </div>
