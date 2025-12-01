@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
-import { Users, Trophy, CheckCircle, Sparkles, QrCode, Clock, Monitor, Loader2, Medal, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
+import { Users, Trophy, CheckCircle, Sparkles, Clock, Monitor, Loader2, Medal, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
 
 interface HostScreenProps {
   state: HostState;
@@ -21,7 +21,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   
-  // Refs for Audio objects
+  // Refs for Audio Elements
   const tickingAudioRef = useRef<HTMLAudioElement | null>(null);
   const fanfareAudioRef = useRef<HTMLAudioElement | null>(null);
   const prevRankingStage = useRef(state.rankingRevealStage);
@@ -29,58 +29,33 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setPlayerUrl(`${window.location.origin}/player`);
-      
-      // Initialize Audio Objects
-      const tick = new Audio(AUDIO_SRC.TICKING);
-      tick.loop = true;
-      tick.volume = 0.5;
-      tick.preload = 'auto';
-      tickingAudioRef.current = tick;
-
-      const fan = new Audio(AUDIO_SRC.FANFARE);
-      fan.volume = 0.8;
-      fan.preload = 'auto';
-      fanfareAudioRef.current = fan;
     }
-    
-    // Cleanup
-    return () => {
-      if (tickingAudioRef.current) {
-        tickingAudioRef.current.pause();
-        tickingAudioRef.current = null;
-      }
-      if (fanfareAudioRef.current) {
-        fanfareAudioRef.current.pause();
-        fanfareAudioRef.current = null;
-      }
-    };
   }, []);
 
   // Handler to toggle sound and "unlock" audio context
-  const toggleSound = () => {
+  const toggleSound = async () => {
     if (!soundEnabled) {
       // Trying to enable sound
-      // We must play() inside this user event handler to unlock the audio
-      const tick = tickingAudioRef.current;
-      const fan = fanfareAudioRef.current;
-
-      if (tick && fan) {
-        // Play and immediately pause to authorize the elements
-        tick.play().then(() => {
-          tick.pause();
-          tick.currentTime = 0;
-        }).catch(e => {
-          console.error("Audio unlock failed", e);
-          setAudioError("Auto-play blocked");
-        });
-        
-        fan.play().then(() => {
-          fan.pause();
-          fan.currentTime = 0;
-        }).catch(e => console.error("Fanfare unlock failed", e));
+      // We must interact with the elements to unlock autoplay
+      try {
+        if (tickingAudioRef.current) {
+            tickingAudioRef.current.volume = 0.5;
+            // Play briefly then pause to unlock
+            await tickingAudioRef.current.play();
+            tickingAudioRef.current.pause();
+        }
+        if (fanfareAudioRef.current) {
+            fanfareAudioRef.current.volume = 0.8;
+            await fanfareAudioRef.current.play();
+            fanfareAudioRef.current.pause();
+            fanfareAudioRef.current.currentTime = 0;
+        }
+        setSoundEnabled(true);
+        setAudioError(null);
+      } catch (e) {
+        console.error("Audio unlock failed", e);
+        setAudioError("再生できませんでした。ブラウザ設定を確認してください。");
       }
-      setSoundEnabled(true);
-      setAudioError(null);
     } else {
       // Disable sound
       if (tickingAudioRef.current) tickingAudioRef.current.pause();
@@ -109,365 +84,300 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
   // --- SOUND LOGIC ---
   
-  // 1. Ticking Sound during Question
   useEffect(() => {
-    const audio = tickingAudioRef.current;
-    if (!audio) return;
+    if (!soundEnabled) return;
 
-    if (soundEnabled && state.gameState === GameState.PLAYING_QUESTION && timeLeft > 0) {
-        // Use a promise to handle play() safely
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.warn("Ticking playback prevented:", error);
-            setAudioError("Playback blocked");
-          });
+    // 1. Ticking
+    // Play only during question time and when time is remaining
+    if (state.gameState === GameState.PLAYING_QUESTION && timeLeft > 0) {
+        // Prevent constant play() calls if already playing
+        if (tickingAudioRef.current && tickingAudioRef.current.paused) {
+            tickingAudioRef.current.play().catch(() => {});
         }
     } else {
-        audio.pause();
-        audio.currentTime = 0;
-    }
-  }, [state.gameState, soundEnabled, timeLeft > 0]);
-
-  // 2. Fanfare Sound during Ranking Reveal
-  useEffect(() => {
-    const audio = fanfareAudioRef.current;
-    if (!audio || !soundEnabled) return;
-
-    // Play sound when stage increases (0->1, 1->2, 2->3) in FINAL_RESULT
-    if (state.gameState === GameState.FINAL_RESULT) {
-        if (state.rankingRevealStage > prevRankingStage.current) {
-            audio.currentTime = 0;
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-              playPromise.catch(error => {
-                console.warn("Fanfare playback prevented:", error);
-              });
-            }
+        if (tickingAudioRef.current) {
+            tickingAudioRef.current.pause();
+            tickingAudioRef.current.currentTime = 0;
         }
     }
-    prevRankingStage.current = state.rankingRevealStage;
-  }, [state.rankingRevealStage, state.gameState, soundEnabled]);
+
+    // 2. Fanfare
+    // Play when ranking stage increments
+    if (state.gameState === GameState.FINAL_RESULT) {
+        if (state.rankingRevealStage > prevRankingStage.current) {
+            if (fanfareAudioRef.current) {
+                fanfareAudioRef.current.currentTime = 0;
+                fanfareAudioRef.current.play().catch(() => {});
+            }
+        }
+        prevRankingStage.current = state.rankingRevealStage;
+    } else {
+        prevRankingStage.current = 0; // Reset tracking
+    }
+
+  }, [state.gameState, state.rankingRevealStage, timeLeft, soundEnabled]);
 
 
-  const answerCount = state.players.filter(p => p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
-  const totalPlayers = state.players.length;
-  const currentQ = state.questions && state.questions[state.currentQuestionIndex] 
-    ? state.questions[state.currentQuestionIndex] 
-    : { text: "Loading...", options: [], correctIndex: 0, explanation: "" };
-
+  // Helper for Final Question
   const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
-  // --- 1. SETUP MODE ---
-  if (state.gameState === GameState.SETUP) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-slate-950 text-white p-6 relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden opacity-20 pointer-events-none">
-           <div className="absolute top-10 left-10 w-64 h-64 bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"></div>
-           <div className="absolute bottom-10 right-10 w-64 h-64 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl animate-pulse animation-delay-2000"></div>
-        </div>
 
-        <div className="z-10 text-center space-y-8">
-           <h1 className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 tracking-tight">
-             {state.quizTitle || 'QUIZ EVENT'}
-           </h1>
-           <div className="flex flex-col items-center gap-4 text-slate-400">
-             <Loader2 size={48} className="animate-spin text-indigo-500"/>
-             <p className="text-xl font-light tracking-widest uppercase">Waiting for Admin to start...</p>
-           </div>
-        </div>
-
-        <div className="absolute bottom-8 right-8 text-slate-600 text-sm flex items-center gap-2">
-           <Monitor size={16} /> Projector View
-        </div>
-      </div>
-    );
-  }
-
-  // --- 2. LOBBY MODE ---
-  if (state.gameState === GameState.LOBBY) {
-    return (
-      <div className="flex flex-col h-screen bg-slate-900 text-white">
-        <main className="flex-1 flex flex-col items-center p-6 text-center relative overflow-hidden">
-          <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16 mb-6 z-10 shrink-0">
-            <div className="text-left space-y-4">
-               <div>
-                 <span className="inline-block px-3 py-1 bg-indigo-600 text-xs font-bold rounded-full mb-2">ENTRY</span>
-                 <h1 className="text-5xl md:text-6xl font-black mb-2 tracking-wide text-white">{state.quizTitle}</h1>
-                 <p className="text-xl md:text-2xl text-indigo-300">QRコードを読み込んで参加してください</p>
-               </div>
-               
-               <div className="space-y-2 text-base hidden md:block">
-                  <div className="flex items-center gap-4 text-slate-300 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
-                    <span className="w-8 h-8 rounded-full bg-white text-slate-900 flex items-center justify-center font-bold">1</span>
-                    <span>スマホでQRコードをスキャン</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-slate-300 bg-slate-800/50 p-3 rounded-xl border border-slate-700">
-                    <span className="w-8 h-8 rounded-full bg-white text-slate-900 flex items-center justify-center font-bold">2</span>
-                    <span>ニックネームを入力して待機</span>
-                  </div>
-                  <div className="mt-2 p-1 bg-black/30 rounded text-[10px] font-mono text-slate-500">
-                    {playerUrl}
-                  </div>
-               </div>
-            </div>
-
-            <div className="p-4 bg-white rounded-3xl shadow-[0_0_50px_rgba(255,255,255,0.1)] transform rotate-2">
-               <div className="w-48 h-48 bg-slate-100 flex flex-col items-center justify-center overflow-hidden rounded-xl">
-                 {playerUrl ? (
-                   <img 
-                     src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(playerUrl)}`}
-                     alt="Join QR Code"
-                     className="w-full h-full object-cover"
-                   />
-                 ) : (
-                   <QrCode size={80} className="text-slate-900" />
-                 )}
-               </div>
-               <div className="mt-2 text-center">
-                 <p className="font-bold text-slate-900 text-lg tracking-widest">JOIN NOW</p>
-               </div>
-            </div>
-          </div>
-
-          <div className="w-full max-w-7xl flex-1 flex flex-col min-h-0 bg-slate-900/50 rounded-t-2xl border-t border-slate-800 p-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-4 shrink-0">
-              <h3 className="text-xl font-bold text-slate-400">
-                 Entry List
-              </h3>
-              <span className="text-3xl font-black text-white">{state.players.length} <span className="text-sm font-normal text-slate-500">Players</span></span>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-                {state.players.map(player => (
-                    <div key={player.id} className="p-2 bg-slate-800 rounded-lg border border-slate-700 flex items-center gap-2 animate-in zoom-in duration-300">
-                    <div className="w-6 h-6 shrink-0 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center font-bold text-[10px]">
-                        {player.name.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="font-bold text-sm truncate w-full">{player.name}</span>
-                    </div>
-                ))}
-                </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // --- 3. GAME SCREEN ---
   return (
-    <div className="flex flex-col h-screen bg-slate-950 text-white overflow-hidden relative">
+    <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
       
-      {/* Sound Toggle Button (Bottom Left) */}
-      <div className="absolute bottom-4 left-4 z-50 flex items-center gap-2">
-        <button 
-            onClick={toggleSound}
-            className={`p-3 rounded-full shadow-lg border transition-all ${soundEnabled ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 border-slate-700'} ${audioError ? 'animate-pulse border-red-500 text-red-500' : ''}`}
-            title={soundEnabled ? "Sound ON" : "Sound OFF (Click to Enable)"}
-        >
-            {soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
-        </button>
-        {audioError && !soundEnabled && (
-           <span className="bg-red-500 text-white text-xs px-2 py-1 rounded animate-bounce">Click to enable sound!</span>
-        )}
-      </div>
+      {/* HIDDEN AUDIO ELEMENTS */}
+      <audio ref={tickingAudioRef} src={AUDIO_SRC.TICKING} loop preload="auto" />
+      <audio ref={fanfareAudioRef} src={AUDIO_SRC.FANFARE} preload="auto" />
 
-      {/* Top Bar */}
-      <header className="bg-slate-900 p-6 flex justify-between items-center border-b border-slate-800 shadow-lg relative z-20">
-        <div className="flex items-center gap-6">
-          <div className={`px-6 py-3 rounded-xl border-2 flex items-center gap-3 shadow-lg transition-all duration-500 ${
-            isFinalQuestion && state.gameState !== GameState.FINAL_RESULT 
-              ? 'bg-red-600 border-red-500 animate-pulse shadow-red-900/50' 
-              : 'bg-slate-800 border-slate-700'
-          }`}>
-             <span className={`font-black block uppercase ${isFinalQuestion && state.gameState !== GameState.FINAL_RESULT ? 'text-2xl text-white tracking-widest' : 'text-white/80 text-sm'}`}>
-                {isFinalQuestion && state.gameState !== GameState.FINAL_RESULT ? (
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle size={28} className="animate-bounce"/>
-                    ⚠️ 最終問題
-                  </div>
-                ) : 'Question'}
-             </span>
-             {(!isFinalQuestion || state.gameState === GameState.FINAL_RESULT) && (
-               <span className="text-3xl font-black font-mono text-white">
-                 {state.currentQuestionIndex + 1}<span className="text-white/50 text-lg">/{state.questions.length}</span>
-               </span>
-             )}
-          </div>
-        </div>
-        
-        {state.gameState === GameState.PLAYING_QUESTION && (
-          <div className={`flex items-center gap-3 text-4xl font-mono font-black ${timeLeft < 5 ? 'text-red-500 animate-pulse' : 'text-white'}`}>
-             <Clock size={36} />
-             {Math.ceil(timeLeft)}
-          </div>
-        )}
-
+      {/* HEADER */}
+      <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10">
         <div className="flex items-center gap-4">
-          <div className="px-6 py-2 bg-indigo-900/30 border border-indigo-500/30 rounded-full flex items-center gap-3">
-             <Users size={20} className="text-indigo-400"/>
-             <span className="text-xl font-bold">{answerCount}</span>
-             <span className="text-slate-500">/ {totalPlayers} Answered</span>
+          <div className="bg-indigo-600 p-2 rounded-lg">
+            <Monitor size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white leading-none">{state.quizTitle}</h1>
+            <p className="text-xs text-slate-400">参加者: {state.players.length}名</p>
           </div>
         </div>
-      </header>
-      
-      {/* Timer Bar */}
-      {state.gameState === GameState.PLAYING_QUESTION && (
-        <div className="h-3 bg-slate-900 w-full">
-           <div 
-             className={`h-full transition-all ease-linear duration-100 ${timeLeft < 5 ? 'bg-red-500' : 'bg-gradient-to-r from-indigo-500 to-purple-500'}`}
-             style={{ width: `${(timeLeft / state.timeLimit) * 100}%` }}
-           />
-        </div>
-      )}
-
-      <main className="flex-1 flex flex-col p-8 max-w-7xl mx-auto w-full relative z-10">
         
-        {state.gameState === GameState.FINAL_RESULT ? (
-           <div className="flex-1 flex flex-col items-center justify-center relative">
-             <h1 className="text-6xl font-black mb-12 text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-500 to-yellow-700 drop-shadow-lg text-center">
-               TOURNAMENT RESULTS
-             </h1>
-             
-             <div className="w-full grid grid-cols-1 gap-4 justify-items-center">
-               {/* Logic for Ranking Reveal Stages */}
-               {(() => {
-                   const sorted = [...state.players].sort((a, b) => {
-                        if (b.score !== a.score) return b.score - a.score;
-                        const timeA = a.totalResponseTime || 0;
-                        const timeB = b.totalResponseTime || 0;
-                        return timeA - timeB;
-                   });
-
-                   const first = sorted[0];
-                   const second = sorted[1];
-                   const third = sorted[2];
-                   const others = sorted.slice(3);
-                   const stage = state.rankingRevealStage;
-
-                   return (
-                       <div className="w-full max-w-5xl flex flex-col items-center gap-8">
-                           
-                           {/* Stage 3: Winner (Gold) */}
-                           {stage >= 3 && first && (
-                               <div className="w-full max-w-2xl bg-gradient-to-b from-yellow-500/20 to-slate-900 border-4 border-yellow-500 p-8 rounded-3xl flex flex-col items-center justify-center shadow-[0_0_50px_rgba(234,179,8,0.5)] animate-in zoom-in duration-1000 relative overflow-hidden">
-                                   <div className="absolute inset-0 bg-yellow-500/10 animate-pulse"></div>
-                                   <Trophy size={80} className="text-yellow-400 mb-4 drop-shadow-lg" />
-                                   <h2 className="text-yellow-300 font-black text-2xl tracking-[0.2em] mb-2">WINNER</h2>
-                                   <div className="text-6xl md:text-7xl font-black text-white mb-4 text-center leading-tight">{first.name}</div>
-                                   <div className="text-5xl font-mono font-bold text-yellow-400">{first.score} <span className="text-2xl">pts</span></div>
-                               </div>
-                           )}
-
-                           <div className="flex flex-row gap-4 w-full justify-center items-end">
-                               {/* Stage 2: 2nd Place (Silver) */}
-                               {stage >= 2 && second && (
-                                   <div className="flex-1 max-w-sm bg-slate-800/80 border-2 border-slate-400 p-6 rounded-2xl flex flex-col items-center shadow-2xl animate-in slide-in-from-bottom-20 duration-700">
-                                       <Medal size={48} className="text-slate-300 mb-2" />
-                                       <h2 className="text-slate-400 font-bold text-lg tracking-widest mb-1">2ND PLACE</h2>
-                                       <div className="text-3xl font-bold text-white mb-2 truncate max-w-full">{second.name}</div>
-                                       <div className="text-3xl font-mono font-bold text-slate-300">{second.score}</div>
-                                   </div>
-                               )}
-
-                               {/* Stage 1: 3rd Place (Bronze) */}
-                               {stage >= 1 && third && (
-                                   <div className="flex-1 max-w-sm bg-slate-800/80 border-2 border-amber-700 p-6 rounded-2xl flex flex-col items-center shadow-2xl animate-in slide-in-from-bottom-20 duration-700 order-first md:order-last">
-                                       <Medal size={48} className="text-amber-600 mb-2" />
-                                       <h2 className="text-amber-700 font-bold text-lg tracking-widest mb-1">3RD PLACE</h2>
-                                       <div className="text-3xl font-bold text-white mb-2 truncate max-w-full">{third.name}</div>
-                                       <div className="text-3xl font-mono font-bold text-amber-600">{third.score}</div>
-                                   </div>
-                               )}
-                           </div>
-
-                           {/* Stage 0: Others */}
-                           {stage >= 0 && others.length > 0 && !state.hideBelowTop3 && (
-                               <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 opacity-80 animate-in fade-in duration-500">
-                                   {others.slice(0, 16).map((p, i) => (
-                                       <div key={p.id} className="bg-slate-800/50 border border-slate-700 p-3 rounded flex items-center justify-between text-sm">
-                                           <div className="flex items-center gap-2">
-                                               <span className="text-slate-500 font-mono">#{i+4}</span>
-                                               <span className="font-bold truncate">{p.name}</span>
-                                           </div>
-                                           <span className="font-mono text-slate-400">{p.score}</span>
-                                       </div>
-                                   ))}
-                                   {others.length > 16 && (
-                                       <div className="col-span-full text-center text-slate-500 italic text-xs p-2">
-                                           ...and {others.length - 16} more
-                                       </div>
-                                   )}
-                               </div>
-                           )}
-                       </div>
-                   );
-               })()}
-             </div>
-           </div>
-        ) : (
-          <>
-            <div className="flex-1 flex flex-col justify-center mb-8">
-              <h2 className="text-4xl md:text-6xl font-bold leading-tight drop-shadow-xl text-center">
-                {currentQ.text}
-              </h2>
+        {/* FINAL QUESTION BANNER */}
+        {state.gameState === GameState.PLAYING_QUESTION && isFinalQuestion && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-8 py-2 rounded-full font-black text-xl animate-pulse shadow-[0_0_20px_rgba(220,38,38,0.6)] flex items-center gap-2 border-2 border-white">
+                <AlertTriangle /> 最終問題 <AlertTriangle />
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 h-[40vh]">
-              {currentQ.options && currentQ.options.map((opt, idx) => {
-                const isReveal = state.gameState === GameState.PLAYING_RESULT;
-                const isCorrect = idx === currentQ.correctIndex;
-                
-                let cardClass = `relative p-8 rounded-2xl border-4 transition-all duration-500 flex items-center overflow-hidden group `;
-                
-                if (isReveal) {
-                  if (isCorrect) {
-                    cardClass += `bg-green-600 border-green-400 shadow-[0_0_40px_rgba(74,222,128,0.4)] scale-105 opacity-100 z-10`;
-                  } else {
-                    cardClass += `bg-slate-800 border-slate-700 opacity-30 grayscale blur-sm scale-95`;
-                  }
-                } else {
-                   cardClass += `bg-slate-800 border-slate-700 text-slate-200 hover:border-slate-500`;
-                }
-
-                return (
-                  <div key={idx} className={cardClass}>
-                    <div className={`absolute left-0 top-0 bottom-0 w-4 ${COLORS[idx].split(' ')[0]}`} />
-                    
-                    <div className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-2xl mr-6 z-10 shadow-lg ${isReveal && isCorrect ? 'bg-white text-green-600' : 'bg-slate-700 text-slate-300'}`}>
-                      {BTN_LABELS[idx]}
-                    </div>
-                    
-                    <span className="text-3xl md:text-4xl font-bold z-10 leading-snug">{opt}</span>
-                    
-                    {isReveal && isCorrect && (
-                      <CheckCircle className="absolute right-6 text-white w-16 h-16 animate-in zoom-in spin-in-90 duration-500" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Explanation Area */}
-            {state.gameState === GameState.PLAYING_RESULT && (
-              <div className="w-full p-8 bg-indigo-900/80 backdrop-blur-md border border-indigo-500/50 rounded-3xl text-indigo-100 animate-in slide-in-from-bottom-10 shadow-2xl">
-                <div className="flex items-start gap-4">
-                  <div className="p-3 bg-indigo-500 rounded-full">
-                    <Sparkles size={32} className="text-white" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-xl text-indigo-300 mb-2 uppercase tracking-wider">Explanation</h4>
-                    <p className="text-2xl md:text-3xl font-medium leading-relaxed">{currentQ.explanation}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
         )}
+
+        {/* QR Code (Mini) */}
+        {state.gameState !== GameState.SETUP && state.gameState !== GameState.LOBBY && (
+             <div className="bg-white p-1 rounded">
+               <img 
+                 src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(playerUrl)}`}
+                 alt="Join QR"
+                 className="w-10 h-10"
+               />
+             </div>
+        )}
+      </header>
+
+      {/* MAIN CONTENT */}
+      <main className="flex-1 relative flex flex-col">
+        
+        {/* 1. LOBBY SCREEN (100 Players Optimized) */}
+        {(state.gameState === GameState.SETUP || state.gameState === GameState.LOBBY) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-start pt-10 p-6">
+            <h2 className="text-4xl md:text-5xl font-black mb-4 text-center text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+              参加者募集中
+            </h2>
+            
+            <div className="flex flex-col md:flex-row items-center gap-8 mb-8 bg-slate-800/50 p-6 rounded-3xl border border-slate-700">
+              <div className="bg-white p-2 rounded-xl shadow-2xl">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(playerUrl)}`}
+                  alt="Join QR"
+                  className="w-48 h-48 md:w-64 md:h-64"
+                />
+              </div>
+              <div className="text-center md:text-left">
+                <p className="text-slate-400 mb-2">スマホでQRコードを読み込んで参加！</p>
+                <p className="text-3xl font-mono font-bold text-white bg-slate-900 px-6 py-3 rounded-xl border border-slate-600">
+                  {playerUrl}
+                </p>
+              </div>
+            </div>
+
+            {/* Scrollable Player Grid for 100+ players */}
+            <div className="w-full max-w-6xl flex-1 bg-slate-800/30 rounded-2xl border border-slate-700 p-4 overflow-hidden flex flex-col">
+               <h3 className="text-lg font-bold text-slate-400 mb-4 flex items-center gap-2">
+                 <Users size={20}/> エントリー済み ({state.players.length}名)
+               </h3>
+               <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 content-start">
+                  {state.players.map(player => (
+                    <div key={player.id} className="bg-slate-700 p-2 rounded-lg flex items-center gap-2 animate-in zoom-in duration-300">
+                      <div className={`w-2 h-2 rounded-full ${player.isOnline !== false ? 'bg-green-400' : 'bg-gray-500'}`} />
+                      <span className="font-bold text-sm truncate">{player.name}</span>
+                    </div>
+                  ))}
+                  {/* Empty placeholders if few players */}
+                  {state.players.length === 0 && (
+                      <p className="col-span-full text-center text-slate-500 py-10">
+                        待機中...
+                      </p>
+                  )}
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2. QUESTION SCREEN */}
+        {state.gameState === GameState.PLAYING_QUESTION && state.questions[state.currentQuestionIndex] && (
+          <div className="absolute inset-0 flex flex-col p-8">
+            {/* Timer Bar */}
+            <div className="w-full h-4 bg-slate-800 rounded-full mb-8 overflow-hidden border border-slate-700">
+              <div 
+                className={`h-full transition-all duration-100 ease-linear ${timeLeft < 5 ? 'bg-red-500' : 'bg-indigo-500'}`}
+                style={{ width: `${(timeLeft / state.timeLimit) * 100}%` }}
+              />
+            </div>
+
+            <div className="flex-1 flex flex-col justify-center max-w-6xl mx-auto w-full">
+               <div className="bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700 mb-8 text-center min-h-[200px] flex items-center justify-center">
+                 <h2 className="text-4xl md:text-5xl font-bold leading-tight">
+                   {state.questions[state.currentQuestionIndex].text}
+                 </h2>
+               </div>
+
+               <div className="grid grid-cols-2 gap-6 h-[400px]">
+                 {state.questions[state.currentQuestionIndex].options.map((option, idx) => (
+                   <div key={idx} className={`${COLORS[idx]} rounded-2xl flex items-center p-6 shadow-lg relative overflow-hidden group`}>
+                      <div className="absolute left-0 top-0 bottom-0 w-24 bg-black/20 flex items-center justify-center text-4xl font-black text-white/50">
+                        {BTN_LABELS[idx]}
+                      </div>
+                      <span className="ml-24 text-3xl font-bold text-white shadow-black drop-shadow-md">
+                        {option}
+                      </span>
+                   </div>
+                 ))}
+               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. QUESTION RESULT SCREEN */}
+        {state.gameState === GameState.PLAYING_RESULT && state.questions[state.currentQuestionIndex] && (
+           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-slate-900">
+              <h2 className="text-3xl font-bold text-slate-400 mb-8 uppercase tracking-widest">Correct Answer</h2>
+              
+              <div className="bg-green-600 text-white p-12 rounded-3xl shadow-[0_0_50px_rgba(22,163,74,0.5)] flex flex-col items-center max-w-4xl w-full animate-in zoom-in duration-500 border-4 border-green-400">
+                 <CheckCircle size={80} className="mb-6" />
+                 <div className="text-5xl font-black text-center mb-4">
+                    {state.questions[state.currentQuestionIndex].options[state.questions[state.currentQuestionIndex].correctIndex]}
+                 </div>
+                 {state.questions[state.currentQuestionIndex].explanation && (
+                     <div className="mt-8 bg-black/20 p-6 rounded-xl w-full text-left">
+                         <div className="flex items-center gap-2 mb-2 text-green-200 font-bold uppercase text-sm">
+                             <Sparkles size={16}/> 解説
+                         </div>
+                         <p className="text-xl leading-relaxed">
+                            {state.questions[state.currentQuestionIndex].explanation}
+                         </p>
+                     </div>
+                 )}
+              </div>
+           </div>
+        )}
+
+        {/* 4. FINAL RANKING SCREEN (Staged Reveal) */}
+        {state.gameState === GameState.FINAL_RESULT && (
+           <div className="absolute inset-0 flex flex-col p-6 bg-slate-900">
+              <div className="text-center mb-6">
+                 <h2 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-amber-600 drop-shadow-sm inline-flex items-center gap-4">
+                    <Trophy size={48} className="text-yellow-500" /> FINAL RANKING
+                 </h2>
+              </div>
+
+              {/* Ranking Grid */}
+              <div className="flex-1 flex gap-6 max-w-7xl mx-auto w-full">
+                  
+                  {/* LEFT: 4th Place and below (Scrollable) */}
+                  {!state.hideBelowTop3 && (
+                  <div className={`flex-1 bg-slate-800/50 rounded-2xl border border-slate-700 p-4 flex flex-col transition-opacity duration-500 ${state.rankingRevealStage >= 0 ? 'opacity-100' : 'opacity-0'}`}>
+                      <h3 className="text-xl font-bold text-slate-400 mb-4 border-b border-slate-700 pb-2">Result List</h3>
+                      <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                          {[...state.players]
+                             .sort((a, b) => {
+                                 if (b.score !== a.score) return b.score - a.score;
+                                 return (a.totalResponseTime || 0) - (b.totalResponseTime || 0);
+                             })
+                             .slice(3) // Skip top 3
+                             .map((p, i) => (
+                             <div key={p.id} className="flex justify-between items-center bg-slate-700/50 p-3 rounded text-lg">
+                                 <div className="flex items-center gap-3">
+                                     <span className="font-mono text-slate-500 w-8 text-right">{i + 4}.</span>
+                                     <span className="font-bold">{p.name}</span>
+                                 </div>
+                                 <div className="font-mono text-indigo-400">{p.score}pts</div>
+                             </div>
+                          ))}
+                          {state.players.length <= 3 && <p className="text-slate-500 text-center mt-10">No other players</p>}
+                      </div>
+                  </div>
+                  )}
+
+                  {/* RIGHT: TOP 3 PODIUM */}
+                  <div className="flex-[2] flex flex-col justify-end pb-10 relative">
+                      <div className="flex justify-center items-end gap-4 h-[500px]">
+                          
+                          {/* 2nd Place */}
+                          <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 2 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
+                             <div className="mb-4 text-center">
+                                 <Medal size={64} className="text-slate-300 mx-auto mb-2" />
+                                 <div className="text-2xl font-bold text-slate-300">2nd</div>
+                                 <div className="text-3xl font-black truncate max-w-[200px]">
+                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[1]?.name || '-'}
+                                 </div>
+                                 <div className="font-mono text-xl text-indigo-400">
+                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[1]?.score || 0} pts
+                                 </div>
+                             </div>
+                             <div className="w-full h-[60%] bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-lg shadow-2xl border-t-4 border-slate-400"></div>
+                          </div>
+
+                          {/* 1st Place */}
+                          <div className={`w-1/3 flex flex-col justify-end items-center z-10 transition-all duration-700 delay-200 transform ${state.rankingRevealStage >= 3 ? 'translate-y-0 opacity-100 scale-110' : 'translate-y-20 opacity-0'}`}>
+                             <div className="mb-4 text-center">
+                                 <Trophy size={80} className="text-yellow-400 mx-auto mb-2 animate-bounce-short" />
+                                 <div className="text-3xl font-bold text-yellow-400">1st</div>
+                                 <div className="text-4xl font-black truncate max-w-[250px] text-white drop-shadow-md">
+                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[0]?.name || '-'}
+                                 </div>
+                                 <div className="font-mono text-2xl text-yellow-200">
+                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[0]?.score || 0} pts
+                                 </div>
+                             </div>
+                             <div className="w-full h-[80%] bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-lg shadow-[0_0_50px_rgba(234,179,8,0.3)] border-t-4 border-yellow-300 relative overflow-hidden">
+                                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
+                             </div>
+                          </div>
+
+                          {/* 3rd Place */}
+                          <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 1 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
+                             <div className="mb-4 text-center">
+                                 <Medal size={64} className="text-amber-700 mx-auto mb-2" />
+                                 <div className="text-2xl font-bold text-amber-700">3rd</div>
+                                 <div className="text-3xl font-black truncate max-w-[200px]">
+                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[2]?.name || '-'}
+                                 </div>
+                                 <div className="font-mono text-xl text-indigo-400">
+                                     {[...state.players].sort((a, b) => b.score - a.score || (a.totalResponseTime||0)-(b.totalResponseTime||0))[2]?.score || 0} pts
+                                 </div>
+                             </div>
+                             <div className="w-full h-[40%] bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-lg shadow-2xl border-t-4 border-amber-600"></div>
+                          </div>
+
+                      </div>
+                  </div>
+              </div>
+           </div>
+        )}
+
       </main>
+
+      {/* FOOTER CONTROLS */}
+      <footer className="bg-slate-800 p-2 flex justify-between items-center text-xs text-slate-500 z-10">
+        <button 
+           onClick={toggleSound}
+           className={`flex items-center gap-2 px-3 py-1 rounded transition ${soundEnabled ? 'bg-green-600 text-white shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-slate-700 hover:bg-slate-600 text-slate-300'}`}
+        >
+          {soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          {soundEnabled ? 'SOUND ON' : 'SOUND OFF (Click to Enable)'}
+        </button>
+        {audioError && <span className="text-red-400 font-bold animate-pulse">{audioError}</span>}
+        <div className="flex gap-4">
+           <span>Room: {state.roomCode}</span>
+           <button onClick={onBack} className="hover:text-white">Exit Viewer</button>
+        </div>
+      </footer>
     </div>
   );
 };
