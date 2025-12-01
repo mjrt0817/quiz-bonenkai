@@ -19,6 +19,9 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   
   // Sound State
   const [soundEnabled, setSoundEnabled] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  
+  // Refs for Audio objects
   const tickingAudioRef = useRef<HTMLAudioElement | null>(null);
   const fanfareAudioRef = useRef<HTMLAudioElement | null>(null);
   const prevRankingStage = useRef(state.rankingRevealStage);
@@ -28,14 +31,63 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
       setPlayerUrl(`${window.location.origin}/player`);
       
       // Initialize Audio Objects
-      tickingAudioRef.current = new Audio(AUDIO_SRC.TICKING);
-      tickingAudioRef.current.loop = true;
-      tickingAudioRef.current.volume = 0.5;
+      const tick = new Audio(AUDIO_SRC.TICKING);
+      tick.loop = true;
+      tick.volume = 0.5;
+      tick.preload = 'auto';
+      tickingAudioRef.current = tick;
 
-      fanfareAudioRef.current = new Audio(AUDIO_SRC.FANFARE);
-      fanfareAudioRef.current.volume = 0.8;
+      const fan = new Audio(AUDIO_SRC.FANFARE);
+      fan.volume = 0.8;
+      fan.preload = 'auto';
+      fanfareAudioRef.current = fan;
     }
+    
+    // Cleanup
+    return () => {
+      if (tickingAudioRef.current) {
+        tickingAudioRef.current.pause();
+        tickingAudioRef.current = null;
+      }
+      if (fanfareAudioRef.current) {
+        fanfareAudioRef.current.pause();
+        fanfareAudioRef.current = null;
+      }
+    };
   }, []);
+
+  // Handler to toggle sound and "unlock" audio context
+  const toggleSound = () => {
+    if (!soundEnabled) {
+      // Trying to enable sound
+      // We must play() inside this user event handler to unlock the audio
+      const tick = tickingAudioRef.current;
+      const fan = fanfareAudioRef.current;
+
+      if (tick && fan) {
+        // Play and immediately pause to authorize the elements
+        tick.play().then(() => {
+          tick.pause();
+          tick.currentTime = 0;
+        }).catch(e => {
+          console.error("Audio unlock failed", e);
+          setAudioError("Auto-play blocked");
+        });
+        
+        fan.play().then(() => {
+          fan.pause();
+          fan.currentTime = 0;
+        }).catch(e => console.error("Fanfare unlock failed", e));
+      }
+      setSoundEnabled(true);
+      setAudioError(null);
+    } else {
+      // Disable sound
+      if (tickingAudioRef.current) tickingAudioRef.current.pause();
+      if (fanfareAudioRef.current) fanfareAudioRef.current.pause();
+      setSoundEnabled(false);
+    }
+  };
 
   // Visual Timer Logic
   useEffect(() => {
@@ -63,7 +115,14 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     if (!audio) return;
 
     if (soundEnabled && state.gameState === GameState.PLAYING_QUESTION && timeLeft > 0) {
-        audio.play().catch(e => console.warn("Audio play blocked", e));
+        // Use a promise to handle play() safely
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.warn("Ticking playback prevented:", error);
+            setAudioError("Playback blocked");
+          });
+        }
     } else {
         audio.pause();
         audio.currentTime = 0;
@@ -79,7 +138,12 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     if (state.gameState === GameState.FINAL_RESULT) {
         if (state.rankingRevealStage > prevRankingStage.current) {
             audio.currentTime = 0;
-            audio.play().catch(e => console.warn("Audio play blocked", e));
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+              playPromise.catch(error => {
+                console.warn("Fanfare playback prevented:", error);
+              });
+            }
         }
     }
     prevRankingStage.current = state.rankingRevealStage;
@@ -197,14 +261,17 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     <div className="flex flex-col h-screen bg-slate-950 text-white overflow-hidden relative">
       
       {/* Sound Toggle Button (Bottom Left) */}
-      <div className="absolute bottom-4 left-4 z-50">
+      <div className="absolute bottom-4 left-4 z-50 flex items-center gap-2">
         <button 
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`p-3 rounded-full shadow-lg border transition-all ${soundEnabled ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
+            onClick={toggleSound}
+            className={`p-3 rounded-full shadow-lg border transition-all ${soundEnabled ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800 text-slate-400 border-slate-700'} ${audioError ? 'animate-pulse border-red-500 text-red-500' : ''}`}
             title={soundEnabled ? "Sound ON" : "Sound OFF (Click to Enable)"}
         >
             {soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
         </button>
+        {audioError && !soundEnabled && (
+           <span className="bg-red-500 text-white text-xs px-2 py-1 rounded animate-bounce">Click to enable sound!</span>
+        )}
       </div>
 
       {/* Top Bar */}
