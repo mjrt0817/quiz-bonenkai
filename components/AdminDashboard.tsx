@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -171,6 +171,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         rankingRevealStage: 0,
         isRankingResultVisible: false,
         hideBelowTop3: false,
+        isLobbyDetailsVisible: false,
         quizTitle: titleInput
       }));
       setStatusMsg(`読み込み成功！ ${questions.length}問セットされました。`);
@@ -244,6 +245,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const toggleHideBelowTop3 = () => {
       updateState(prev => ({ ...prev, hideBelowTop3: !prev.hideBelowTop3 }));
   };
+  
+  const toggleLobbyDetails = () => {
+    updateState(prev => ({ ...prev, isLobbyDetailsVisible: !prev.isLobbyDetailsVisible }));
+  };
 
   const resetGame = () => {
     updateState(prev => ({
@@ -252,7 +257,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       questions: [],
       rankingRevealStage: 0,
       isRankingResultVisible: false,
-      hideBelowTop3: false
+      hideBelowTop3: false,
+      isLobbyDetailsVisible: false
     }));
     setStatusMsg('ゲームをリセットしました');
   };
@@ -445,9 +451,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 {state.gameState === GameState.LOBBY && (
-                  <button onClick={startGame} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700">
-                     クイズ開始！
-                  </button>
+                  <div className="space-y-2">
+                     <button onClick={toggleLobbyDetails} className={`w-full py-3 rounded-lg font-bold text-sm border flex items-center justify-center gap-2 transition ${state.isLobbyDetailsVisible ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'}`}>
+                         {state.isLobbyDetailsVisible ? <ImageIcon size={18}/> : <QrCode size={18}/>}
+                         {state.isLobbyDetailsVisible ? 'タイトル画面に戻す' : 'QRコード・参加者を表示'}
+                     </button>
+                     <button onClick={startGame} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700">
+                        クイズ開始！
+                     </button>
+                  </div>
                 )}
 
                 {state.gameState === GameState.PLAYING_QUESTION && (
