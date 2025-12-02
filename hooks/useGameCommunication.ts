@@ -35,12 +35,19 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     const handleStateChange = (snapshot: any) => {
       const data = snapshot.val();
       if (data) {
-        // Ensure basic structure prevents crashes
+        // Ensure players is always an array, even if Firebase returns an object map
+        let safePlayers: Player[] = [];
+        if (Array.isArray(data.players)) {
+            safePlayers = data.players;
+        } else if (data.players && typeof data.players === 'object') {
+            safePlayers = Object.values(data.players) as Player[];
+        }
+
         setHostState({
             ...INITIAL_HOST_STATE,
             ...data,
             questions: data.questions || [],
-            players: data.players || []
+            players: safePlayers
         });
       } else if (role === 'HOST' || role === 'ADMIN') {
         // If no state exists and we are host/admin, initialize it
