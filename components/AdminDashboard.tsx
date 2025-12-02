@@ -58,7 +58,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Optimize player sorting using useMemo to prevent re-calculations on every render
   // SORT: Score (Desc) -> TotalResponseTime (Asc) -> Name (Asc)
   const sortedPlayers = useMemo(() => {
-    return [...state.players].sort((a, b) => {
+    // Safety check: ensure players is an array
+    const players = Array.isArray(state.players) ? state.players : [];
+    
+    return [...players].sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
         // Tie-breaker: Faster total time wins (smaller value)
         const timeA = a.totalResponseTime || 0;
@@ -274,7 +277,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   // --- Stats Calculation ---
-  const answeredCount = state.players.filter(p => p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
+  const answeredCount = Array.isArray(state.players) 
+      ? state.players.filter(p => p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length 
+      : 0;
+      
   // Safe access with fallbacks to prevent crash
   const currentQ = (state.questions && state.questions[state.currentQuestionIndex]) 
     ? state.questions[state.currentQuestionIndex]
@@ -571,7 +577,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[400px]">
                 <div className="p-4 border-b border-slate-200 flex justify-between items-center">
                     <h2 className="font-bold text-lg flex items-center gap-2 text-slate-700">
-                        <Users size={20}/> 参加者管理 ({state.players.length}名)
+                        <Users size={20}/> 参加者管理 ({Array.isArray(state.players) ? state.players.length : 0}名)
                     </h2>
                     <div className="flex gap-2">
                         <button 
@@ -659,7 +665,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </table>
                 </div>
                 <div className="p-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 flex justify-between">
-                    <span>現在の回答率: {Math.round((answeredCount / (state.players.length || 1)) * 100)}%</span>
+                    <span>現在の回答率: {Math.round((answeredCount / (Array.isArray(state.players) ? state.players.length : 1)) * 100)}%</span>
                     <span>Room: {state.roomCode}</span>
                 </div>
             </div>
