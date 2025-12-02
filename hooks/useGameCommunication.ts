@@ -94,7 +94,12 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     setHostState(prev => {
       const newState = updater(prev);
       const stateRef = db.ref(`rooms/${ROOM_ID}/state`);
-      stateRef.set(newState).catch((err: any) => console.error("Firebase update failed", err));
+      
+      // Sanitize newState before sending to Firebase to remove undefined values
+      // JSON.stringify removes keys with undefined values, which fixes the "value argument contains undefined" error
+      const sanitizedState = JSON.parse(JSON.stringify(newState));
+      
+      stateRef.set(sanitizedState).catch((err: any) => console.error("Firebase update failed", err));
       return newState;
     });
   }, [role]);
