@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
-import { Users, Trophy, CheckCircle, Sparkles, Monitor, Medal, AlertTriangle } from 'lucide-react';
+import { Users, CheckCircle, Sparkles, Monitor, Medal, Trophy, AlertTriangle } from 'lucide-react';
 
 interface HostScreenProps {
   state: HostState;
@@ -46,6 +46,10 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
   // Determines if we are in the "Title Only" mode of the Lobby
   const isTitleOnlyMode = (state.gameState === GameState.LOBBY || state.gameState === GameState.SETUP) && !state.isLobbyDetailsVisible;
+
+  // Current Question Data
+  const currentQuestion = state.questions[state.currentQuestionIndex];
+  const hasImages = currentQuestion?.optionImages && currentQuestion.optionImages.some(img => img && img.trim() !== "");
 
   return (
     <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
@@ -164,7 +168,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
         )}
 
         {/* 2. QUESTION SCREEN */}
-        {state.gameState === GameState.PLAYING_QUESTION && state.questions[state.currentQuestionIndex] && (
+        {state.gameState === GameState.PLAYING_QUESTION && currentQuestion && (
           <div className="absolute inset-0 flex flex-col p-8">
             {/* Timer Bar */}
             <div className="w-full h-4 bg-slate-800 rounded-full mb-8 overflow-hidden border border-slate-700">
@@ -175,44 +179,79 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
             </div>
 
             <div className="flex-1 flex flex-col justify-center max-w-6xl mx-auto w-full">
-               <div className="bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700 mb-8 text-center min-h-[200px] flex items-center justify-center">
+               <div className="bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700 mb-8 text-center min-h-[150px] flex items-center justify-center">
                  <h2 className="text-4xl md:text-5xl font-bold leading-tight">
-                   {state.questions[state.currentQuestionIndex].text}
+                   {currentQuestion.text}
                  </h2>
                </div>
 
-               <div className="grid grid-cols-2 gap-6 h-[400px]">
-                 {state.questions[state.currentQuestionIndex].options.map((option, idx) => (
-                   <div key={idx} className={`${COLORS[idx]} rounded-2xl flex items-center p-6 shadow-lg relative overflow-hidden group`}>
-                      <div className="absolute left-0 top-0 bottom-0 w-24 bg-black/20 flex items-center justify-center text-4xl font-black text-white/50">
-                        {BTN_LABELS[idx]}
-                      </div>
-                      <span className="ml-24 text-3xl font-bold text-white shadow-black drop-shadow-md">
-                        {option}
-                      </span>
-                   </div>
-                 ))}
+               {/* OPTION GRID - Layout adapts if images are present */}
+               <div className="grid grid-cols-2 gap-6 h-[500px]">
+                 {currentQuestion.options.map((option, idx) => {
+                   const imgUrl = currentQuestion.optionImages?.[idx];
+                   return (
+                    <div key={idx} className={`${COLORS[idx]} rounded-2xl flex relative overflow-hidden group shadow-lg`}>
+                        {/* Option Label (A, B, C, D) */}
+                        <div className="absolute left-0 top-0 z-20 bg-black/40 w-12 h-12 flex items-center justify-center rounded-br-xl text-2xl font-black text-white">
+                            {BTN_LABELS[idx]}
+                        </div>
+
+                        {/* Content */}
+                        {imgUrl ? (
+                            // Image Mode
+                            <div className="flex-1 flex flex-col h-full">
+                                <div className="flex-1 relative bg-white">
+                                    <img src={imgUrl} alt={`Option ${idx}`} className="absolute inset-0 w-full h-full object-contain p-2" />
+                                </div>
+                                <div className="p-4 text-center bg-black/10 min-h-[60px] flex items-center justify-center">
+                                    <span className="text-2xl font-bold text-white drop-shadow-md">{option}</span>
+                                </div>
+                            </div>
+                        ) : (
+                            // Text Only Mode
+                            <div className="flex-1 flex items-center justify-center p-6">
+                                <div className="absolute left-0 top-0 bottom-0 w-24 bg-black/10"></div> {/* Decorative sidebar */}
+                                <span className="ml-10 text-4xl font-bold text-white shadow-black drop-shadow-md leading-tight">
+                                    {option}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                   );
+                 })}
                </div>
             </div>
           </div>
         )}
 
         {/* 3. RESULT SCREEN */}
-        {state.gameState === GameState.PLAYING_RESULT && state.questions[state.currentQuestionIndex] && (
+        {state.gameState === GameState.PLAYING_RESULT && currentQuestion && (
            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-slate-900">
               <h2 className="text-3xl font-bold text-slate-400 mb-8 uppercase tracking-widest">Correct Answer</h2>
               <div className="bg-green-600 text-white p-12 rounded-3xl shadow-[0_0_50px_rgba(22,163,74,0.5)] flex flex-col items-center max-w-4xl w-full animate-in zoom-in duration-500 border-4 border-green-400">
                  <CheckCircle size={80} className="mb-6" />
+                 
+                 {/* Show Image if available for correct answer */}
+                 {currentQuestion.optionImages?.[currentQuestion.correctIndex] && (
+                     <div className="mb-6 bg-white p-2 rounded-xl">
+                        <img 
+                            src={currentQuestion.optionImages[currentQuestion.correctIndex]} 
+                            alt="Correct" 
+                            className="h-48 object-contain"
+                        />
+                     </div>
+                 )}
+
                  <div className="text-5xl font-black text-center mb-4">
-                    {state.questions[state.currentQuestionIndex].options[state.questions[state.currentQuestionIndex].correctIndex]}
+                    {currentQuestion.options[currentQuestion.correctIndex]}
                  </div>
-                 {state.questions[state.currentQuestionIndex].explanation && (
+                 {currentQuestion.explanation && (
                      <div className="mt-8 bg-black/20 p-6 rounded-xl w-full text-left">
                          <div className="flex items-center gap-2 mb-2 text-green-200 font-bold uppercase text-sm">
                              <Sparkles size={16}/> 解説
                          </div>
                          <p className="text-xl leading-relaxed">
-                            {state.questions[state.currentQuestionIndex].explanation}
+                            {currentQuestion.explanation}
                          </p>
                      </div>
                  )}
