@@ -44,90 +44,122 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
       return (a.totalResponseTime || 0) - (b.totalResponseTime || 0);
   });
 
+  // Determines if we are in the "Title Only" mode of the Lobby
+  const isTitleOnlyMode = (state.gameState === GameState.LOBBY || state.gameState === GameState.SETUP) && !state.isLobbyDetailsVisible;
+
   return (
     <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
       
-      {/* HEADER */}
-      <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10">
-        <div className="flex items-center gap-4">
-          <div className="bg-indigo-600 p-2 rounded-lg">
-            <Monitor size={24} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-white leading-none">{state.quizTitle}</h1>
-            <p className="text-xs text-slate-400">参加者: {state.players.length}名</p>
-          </div>
-        </div>
-        
-        {/* FINAL QUESTION BANNER */}
-        {state.gameState === GameState.PLAYING_QUESTION && isFinalQuestion && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-8 py-2 rounded-full font-black text-xl animate-pulse shadow-[0_0_20px_rgba(220,38,38,0.6)] flex items-center gap-2 border-2 border-white">
-                <AlertTriangle /> ⚠️ 最終問題 ⚠️ <AlertTriangle />
+      {/* HEADER - Hidden in Title Only Mode for Full Immersion */}
+      {!isTitleOnlyMode && (
+        <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10">
+            <div className="flex items-center gap-4">
+            <div className="bg-indigo-600 p-2 rounded-lg">
+                <Monitor size={24} />
             </div>
-        )}
+            <div>
+                <h1 className="text-xl font-bold text-white leading-none">{state.quizTitle}</h1>
+                <p className="text-xs text-slate-400">参加者: {state.players.length}名</p>
+            </div>
+            </div>
+            
+            {/* FINAL QUESTION BANNER */}
+            {state.gameState === GameState.PLAYING_QUESTION && isFinalQuestion && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-8 py-2 rounded-full font-black text-xl animate-pulse shadow-[0_0_20px_rgba(220,38,38,0.6)] flex items-center gap-2 border-2 border-white">
+                    <AlertTriangle /> ⚠️ 最終問題 ⚠️ <AlertTriangle />
+                </div>
+            )}
 
-        {/* QR Code (Mini) */}
-        {state.gameState !== GameState.SETUP && state.gameState !== GameState.LOBBY && (
-             <div className="bg-white p-1 rounded">
-               <img 
-                 src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(playerUrl)}`}
-                 alt="Join QR"
-                 className="w-10 h-10"
-               />
-             </div>
-        )}
-      </header>
+            {/* QR Code (Mini) */}
+            {state.gameState !== GameState.SETUP && state.gameState !== GameState.LOBBY && (
+                <div className="bg-white p-1 rounded">
+                <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=${encodeURIComponent(playerUrl)}`}
+                    alt="Join QR"
+                    className="w-10 h-10"
+                />
+                </div>
+            )}
+        </header>
+      )}
 
       {/* MAIN CONTENT */}
       <main className="flex-1 relative flex flex-col">
         
         {/* 1. LOBBY SCREEN */}
         {(state.gameState === GameState.SETUP || state.gameState === GameState.LOBBY) && (
-          <div className="absolute inset-0 flex flex-col items-center justify-start pt-10 p-6">
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
             
-            {/* Title Image or Text */}
-            {state.titleImage ? (
-                <div className="mb-4 max-h-[120px] md:max-h-[160px] flex justify-center">
-                    <img src={state.titleImage} alt="Tournament Title" className="h-full object-contain drop-shadow-lg" />
+            {/* CASE A: Title Only Mode (Full Screen) */}
+            {isTitleOnlyMode ? (
+                <div className="w-full h-full flex items-center justify-center bg-black relative">
+                     {/* Background Pattern */}
+                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
+                     
+                     {state.titleImage ? (
+                         <img 
+                            src={state.titleImage} 
+                            alt="Tournament Title" 
+                            className="w-full h-full object-contain" 
+                         />
+                     ) : (
+                         <div className="text-center z-10 p-10">
+                            <h2 className="text-6xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400 tracking-tight leading-tight mb-6 animate-pulse-fast">
+                                {state.quizTitle}
+                            </h2>
+                            <p className="text-2xl text-slate-400 font-bold uppercase tracking-[0.5em]">Coming Soon</p>
+                         </div>
+                     )}
                 </div>
             ) : (
-                <h2 className="text-4xl md:text-5xl font-black mb-4 text-center text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
-                参加者募集中
-                </h2>
-            )}
-            
-            <div className="flex flex-col md:flex-row items-center gap-8 mb-8 bg-slate-800/50 p-6 rounded-3xl border border-slate-700">
-              <div className="bg-white p-2 rounded-xl shadow-2xl">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(playerUrl)}`}
-                  alt="Join QR"
-                  className="w-48 h-48 md:w-64 md:h-64"
-                />
-              </div>
-              <div className="text-center md:text-left">
-                <p className="text-slate-400 mb-2">スマホでQRコードを読み込んで参加！</p>
-                <p className="text-3xl font-mono font-bold text-white bg-slate-900 px-6 py-3 rounded-xl border border-slate-600">
-                  {playerUrl}
-                </p>
-              </div>
-            </div>
-
-            <div className="w-full max-w-6xl flex-1 bg-slate-800/30 rounded-2xl border border-slate-700 p-4 overflow-hidden flex flex-col">
-               <h3 className="text-lg font-bold text-slate-400 mb-4 flex items-center gap-2">
-                 <Users size={20}/> エントリー済み ({state.players.length}名)
-               </h3>
-               <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 content-start">
-                  {state.players.map(player => (
-                    <div key={player.id} className="bg-slate-700 p-2 rounded-lg flex items-center gap-2 animate-in zoom-in duration-300">
-                      <div className={`w-2 h-2 rounded-full ${player.isOnline !== false ? 'bg-green-400' : 'bg-gray-500'}`} />
-                      <span className="font-bold text-sm truncate">{player.name}</span>
+                /* CASE B: Details Mode (QR & Players) */
+                <div className="w-full h-full flex flex-col items-center justify-start pt-6 p-6">
+                    
+                    {/* Small Title Image or Text at top */}
+                    {state.titleImage ? (
+                        <div className="mb-4 max-h-[100px] flex justify-center">
+                            <img src={state.titleImage} alt="Tournament Title" className="h-full object-contain drop-shadow-lg" />
+                        </div>
+                    ) : (
+                        <h2 className="text-4xl font-black mb-4 text-center text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+                           参加者募集中
+                        </h2>
+                    )}
+                    
+                    <div className="flex flex-col md:flex-row items-center gap-8 mb-6 bg-slate-800/50 p-6 rounded-3xl border border-slate-700">
+                    <div className="bg-white p-2 rounded-xl shadow-2xl">
+                        <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(playerUrl)}`}
+                        alt="Join QR"
+                        className="w-40 h-40 md:w-56 md:h-56"
+                        />
                     </div>
-                  ))}
-                  {state.players.length === 0 && (
-                      <p className="col-span-full text-center text-slate-500 py-10">待機中...</p>
-                  )}
-               </div>
-            </div>
+                    <div className="text-center md:text-left">
+                        <p className="text-slate-400 mb-2">スマホでQRコードを読み込んで参加！</p>
+                        <p className="text-3xl font-mono font-bold text-white bg-slate-900 px-6 py-3 rounded-xl border border-slate-600">
+                        {playerUrl}
+                        </p>
+                    </div>
+                    </div>
+
+                    <div className="w-full max-w-6xl flex-1 bg-slate-800/30 rounded-2xl border border-slate-700 p-4 overflow-hidden flex flex-col">
+                        <h3 className="text-lg font-bold text-slate-400 mb-4 flex items-center gap-2">
+                            <Users size={20}/> エントリー済み ({state.players.length}名)
+                        </h3>
+                        <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 content-start">
+                            {state.players.map(player => (
+                                <div key={player.id} className="bg-slate-700 p-2 rounded-lg flex items-center gap-2 animate-in zoom-in duration-300">
+                                <div className={`w-2 h-2 rounded-full ${player.isOnline !== false ? 'bg-green-400' : 'bg-gray-500'}`} />
+                                <span className="font-bold text-sm truncate">{player.name}</span>
+                                </div>
+                            ))}
+                            {state.players.length === 0 && (
+                                <p className="col-span-full text-center text-slate-500 py-10">待機中...</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
           </div>
         )}
 
@@ -258,13 +290,15 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
       </main>
 
-      {/* FOOTER CONTROLS */}
-      <footer className="bg-slate-800 p-2 flex justify-between items-center text-xs text-slate-500 z-10">
-        <div className="flex gap-4">
-           <span>Room: {state.roomCode}</span>
-           <button onClick={onBack} className="hover:text-white">Exit Viewer</button>
-        </div>
-      </footer>
+      {/* FOOTER CONTROLS - Hide on Title Only mode */}
+      {!isTitleOnlyMode && (
+        <footer className="bg-slate-800 p-2 flex justify-between items-center text-xs text-slate-500 z-10">
+            <div className="flex gap-4">
+            <span>Room: {state.roomCode}</span>
+            <button onClick={onBack} className="hover:text-white">Exit Viewer</button>
+            </div>
+        </footer>
+      )}
     </div>
   );
 };
