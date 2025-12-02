@@ -160,9 +160,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const loadQuestions = async () => {
     if (!csvUrl) return;
     setIsLoading(true);
-    setStatusMsg('');
+    setStatusMsg('読み込み中...');
     try {
       const questions = await parseCSVQuiz(csvUrl);
+      
+      // Validation check to prevent crash
+      if (!Array.isArray(questions) || questions.length === 0) {
+        throw new Error("有効な問題データが見つかりませんでした。");
+      }
+
       updateState(prev => ({
         ...prev,
         questions,
@@ -174,8 +180,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         isLobbyDetailsVisible: false,
         quizTitle: titleInput
       }));
-      setStatusMsg(`読み込み成功！ ${questions.length}問セットされました。`);
+      setStatusMsg(`成功！ ${questions.length}問ロード完了`);
     } catch (err: any) {
+      console.error(err);
       setStatusMsg(`エラー: ${err.message}`);
     } finally {
       setIsLoading(false);
@@ -265,12 +272,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // --- Stats Calculation ---
   const answeredCount = state.players.filter(p => p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
-  // Safe access
-  const currentQ = state.questions && state.questions[state.currentQuestionIndex] 
+  // Safe access with fallbacks to prevent crash
+  const currentQ = (state.questions && state.questions[state.currentQuestionIndex]) 
     ? state.questions[state.currentQuestionIndex]
-    : { text: "", options: [] };
+    : { text: "読み込みエラー", options: [] };
 
-  const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
+  const isFinalQuestion = state.questions && state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
   // Logic to determine which ranking button to show
   const renderRankingControl = () => {
@@ -397,11 +404,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     type="text" 
                     value={csvUrl}
                     onChange={(e) => setCsvUrl(e.target.value)}
-                    placeholder="CSVの公開URLを貼り付け"
+                    placeholder="スプレッドシートのURLを貼り付け"
                     className="w-full px-3 py-2 border rounded text-sm"
                   />
                 </div>
-                <p className="text-xs text-slate-500">※ スプレッドシートを「ウェブに公開(CSV)」してURLを取得してください</p>
+                <p className="text-xs text-slate-500">※ 通常の編集用URLでも、CSV公開用URLでもOKです</p>
                 <button 
                   onClick={loadQuestions}
                   disabled={isLoading || !csvUrl}
@@ -409,13 +416,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 >
                   {isLoading ? <Loader2 className="animate-spin mx-auto"/> : 'ロード'}
                 </button>
-                {statusMsg && <p className="text-xs font-bold text-red-500">{statusMsg}</p>}
+                {statusMsg && (
+                    <div className={`text-xs font-bold mt-2 p-2 rounded ${statusMsg.startsWith('エラー') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                        {statusMsg}
+                    </div>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
                 <p className="text-sm font-bold text-green-600">✅ {state.questions.length}問 ロード済み</p>
                 <p className="text-xs text-slate-500">Title: {state.quizTitle}</p>
-                <button onClick={resetGame} className="w-full border border-slate-300 py-2 rounded text-xs hover:bg-slate-50">
+                <button onClick={resetGame} className="w-full border border-slate-300 py-2 rounded text-xs hover:bg-slate-50 text-slate-600">
                   クイズデータを破棄してリセット
                 </button>
               </div>
