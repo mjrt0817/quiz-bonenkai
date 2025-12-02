@@ -49,13 +49,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }))
   );
   
-  // Refs to hold Audio objects
-  const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
-
-  useEffect(() => {
-    // Initialize refs array
-    audioRefs.current = audioRefs.current.slice(0, 6);
-  }, []);
+  // Refs to hold Audio objects - Initialize with array of 6 nulls
+  const audioRefs = useRef<(HTMLAudioElement | null)[]>(new Array(6).fill(null));
 
   useEffect(() => {
     if(state.quizTitle) setTitleInput(state.quizTitle);
