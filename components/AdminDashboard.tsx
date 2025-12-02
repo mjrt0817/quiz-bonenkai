@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -29,7 +29,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [csvUrl, setCsvUrl] = useState('');
   const [titleInput, setTitleInput] = useState(state.quizTitle || 'クイズ大会');
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMsg, setStatusMsg] = useState('');
+  const [logs, setLogs] = useState<string[]>([]);
+
+  // Helper to add log
+  const addLog = (msg: string) => {
+      setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 50));
+  };
 
   // Sound Board State
   const [soundSlots, setSoundSlots] = useState<SoundSlot[]>(
@@ -58,18 +63,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Optimize player sorting using useMemo to prevent re-calculations on every render
   // SORT: Score (Desc) -> TotalResponseTime (Asc) -> Name (Asc)
   const sortedPlayers = useMemo(() => {
-    // Safety check: ensure players is an array
-    const players = Array.isArray(state.players) ? state.players : [];
-    
-    return [...players].sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        // Tie-breaker: Faster total time wins (smaller value)
-        const timeA = a.totalResponseTime || 0;
-        const timeB = b.totalResponseTime || 0;
-        if (timeA !== timeB) return timeA - timeB;
-        return a.name.localeCompare(b.name);
-    });
+    try {
+        // Safety check: ensure players is an array
+        const players = Array.isArray(state.players) ? state.players : [];
+        
+        // Filter out null/undefined players to prevent crash
+        const validPlayers = players.filter(p => p && typeof p === 'object' && p.id);
+        
+        return [...validPlayers].sort((a, b) => {
+            const scoreA = typeof a.score === 'number' ? a.score : 0;
+            const scoreB = typeof b.score === 'number' ? b.score : 0;
+            if (scoreB !== scoreA) return scoreB - scoreA;
+            
+            // Tie-breaker: Faster total time wins (smaller value)
+            const timeA = typeof a.totalResponseTime === 'number' ? a.totalResponseTime : 0;
+            const timeB = typeof b.totalResponseTime === 'number' ? b.totalResponseTime : 0;
+            if (timeA !== timeB) return timeA - timeB;
+            
+            const nameA = a.name ? String(a.name) : '';
+            const nameB = b.name ? String(b.name) : '';
+            return nameA.localeCompare(nameB);
+        });
+    } catch (e) {
+        console.error("Sort error", e);
+        return [];
+    }
   }, [state.players]);
+
+  const answeredCount = state.players.filter(p => p && p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
 
   // --- Image Upload Function ---
   const handleTitleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,6 +104,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       reader.onload = (ev) => {
         const base64 = ev.target?.result as string;
         updateState(prev => ({ ...prev, titleImage: base64 }));
+        addLog("大会画像をアップロードしました");
       };
       reader.readAsDataURL(file);
     }
@@ -90,6 +112,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const clearTitleImage = () => {
     updateState(prev => ({ ...prev, titleImage: null }));
+    addLog("大会画像をクリアしました");
   };
 
 
@@ -98,43 +121,62 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
+      
+      // Cleanup old url if exists
+      const oldSlot = soundSlots[index];
+      if (oldSlot.url) URL.revokeObjectURL(oldSlot.url);
+
       setSoundSlots(prev => prev.map((slot, i) => 
         i === index ? { ...slot, file, url, isPlaying: false } : slot
       ));
+      addLog(`Slot #${index + 1}: ファイルをセットしました (${file.name})`);
     }
   };
 
   const togglePlaySound = (index: number) => {
-    const slot = soundSlots[index];
-    const audio = audioRefs.current[index];
-    
-    if (!slot.url) return;
+    try {
+        const slot = soundSlots[index];
+        const audio = audioRefs.current[index];
+        
+        if (!slot.url) return;
 
-    if (!audio) {
-      // First time init for this slot
-      const newAudio = new Audio(slot.url);
-      newAudio.volume = slot.volume;
-      newAudio.loop = slot.isLoop;
-      
-      newAudio.onended = () => {
-        if (!newAudio.loop) {
+        if (!audio || audio.src !== slot.url) {
+        // First time init or file changed
+        const newAudio = new Audio(slot.url);
+        newAudio.volume = slot.volume;
+        newAudio.loop = slot.isLoop;
+        
+        newAudio.onended = () => {
+            if (!newAudio.loop) {
+                setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
+            }
+        };
+        
+        newAudio.onerror = (e) => {
+            console.error("Audio error", e);
+            addLog(`Slot #${index + 1} Error: 再生できませんでした`);
             setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-        }
-      };
-      
-      audioRefs.current[index] = newAudio;
-      newAudio.play().catch(e => console.error("Play error", e));
-      setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
-    } else {
-      if (slot.isPlaying) {
-        // If playing, restart from beginning (Pon-dashi style)
-        audio.currentTime = 0;
-        audio.play();
-      } else {
-        // Resume/Start
-        audio.play();
+        };
+        
+        audioRefs.current[index] = newAudio;
+        newAudio.play().catch(e => {
+            console.error("Play error", e);
+            addLog(`Slot #${index + 1} Play Error: ${e.message}`);
+        });
         setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
-      }
+        } else {
+        if (slot.isPlaying) {
+            // Restart
+            audio.currentTime = 0;
+            audio.play().catch(e => console.error(e));
+        } else {
+            // Resume/Start
+            audio.play().catch(e => console.error(e));
+            setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
+        }
+        }
+    } catch (e: any) {
+        addLog(`Sound Error: ${e.message}`);
     }
   };
 
@@ -163,7 +205,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const loadQuestions = async () => {
     if (!csvUrl) return;
     setIsLoading(true);
-    setStatusMsg('読み込み中... (プロキシ経由で試行します)');
+    addLog('CSV読み込み開始...');
     
     try {
       const questions = await parseCSVQuiz(csvUrl);
@@ -184,12 +226,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         isLobbyDetailsVisible: false,
         quizTitle: titleInput
       }));
-      setStatusMsg(`成功！ ${questions.length}問ロード完了`);
+      addLog(`成功！ ${questions.length}問をロードしました`);
     } catch (err: any) {
       console.error("Load Error:", err);
       // Safe error message
       const msg = err instanceof Error ? err.message : String(err);
-      setStatusMsg(`エラー: ${msg}`);
+      addLog(`読み込みエラー: ${msg}`);
+      alert(`読み込みエラー: ${msg}`);
     } finally {
       setIsLoading(false);
     }
@@ -206,18 +249,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       rankingRevealStage: 0,
       isRankingResultVisible: false
     }));
+    addLog("クイズを開始しました");
   };
 
   const showResults = async () => {
-    // 1. Calculate scores first
+    addLog("回答締め切り・集計中...");
     await calculateAndSaveScores();
     
-    // 2. Then change state to show results
     updateState(prev => ({
       ...prev,
       gameState: GameState.PLAYING_RESULT,
       questionStartTime: null 
     }));
+    addLog("正解を表示しました");
   };
 
   const nextQuestion = () => {
@@ -225,13 +269,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     updateState(prev => {
       const nextIndex = prev.currentQuestionIndex + 1;
       if (nextIndex >= prev.questions.length) {
+        addLog("最終結果画面へ移行");
         return { 
             ...prev, 
             gameState: GameState.FINAL_RESULT,
-            rankingRevealStage: 0, // Start with stage 0 (4th place and below)
+            rankingRevealStage: 0, 
             isRankingResultVisible: false
         };
       }
+      addLog(`第${nextIndex + 1}問へ移行`);
       return {
         ...prev,
         currentQuestionIndex: nextIndex,
@@ -241,7 +287,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
   };
 
-  // Move to next stage (Prepare/Suspense phase)
   const goToStage = (stage: number) => {
       updateState(prev => ({ 
           ...prev, 
@@ -250,7 +295,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }));
   };
 
-  // Reveal current stage (Open phase)
   const revealStage = () => {
       updateState(prev => ({ ...prev, isRankingResultVisible: true }));
   };
@@ -273,28 +317,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       hideBelowTop3: false,
       isLobbyDetailsVisible: false
     }));
-    setStatusMsg('ゲームをリセットしました');
+    addLog("ゲームをリセットしました");
   };
 
-  // --- Stats Calculation ---
-  const answeredCount = Array.isArray(state.players) 
-      ? state.players.filter(p => p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length 
-      : 0;
-      
   // Safe access with fallbacks to prevent crash
   const currentQ = (state.questions && state.questions[state.currentQuestionIndex]) 
     ? state.questions[state.currentQuestionIndex]
-    : { text: "読み込みエラー", options: [] };
+    : { text: "Loading...", options: [] };
 
   const isFinalQuestion = state.questions && state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
-  // Logic to determine which ranking button to show
+  // Render logic for ranking buttons
   const renderRankingControl = () => {
       const stage = state.rankingRevealStage;
       const visible = state.isRankingResultVisible;
 
       if (stage === 0) {
-          // Initial state: "Prepare 3rd Place"
           return (
              <button onClick={() => goToStage(1)} className="w-full bg-amber-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-amber-700 flex items-center justify-center gap-2">
                  <Medal size={24}/> 3位の発表準備 (READY)
@@ -347,13 +385,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans pb-20">
       {/* Header */}
       <header className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md">
         <div className="flex items-center gap-4">
            <h1 className="text-xl font-bold bg-red-600 px-3 py-1 rounded">ADMIN MODE</h1>
-           <span className="text-slate-400 text-sm">Status: {state.gameState}</span>
-           <span className="text-slate-400 text-sm border-l border-slate-700 pl-4">Title: {state.quizTitle}</span>
+           <span className="text-slate-400 text-sm hidden sm:inline">Status: {state.gameState}</span>
+           <span className="text-slate-400 text-sm border-l border-slate-700 pl-4 hidden sm:inline">Title: {state.quizTitle}</span>
         </div>
         <button onClick={onBack} className="text-sm hover:underline text-slate-300">終了する</button>
       </header>
@@ -425,11 +463,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 >
                   {isLoading ? <Loader2 className="animate-spin mx-auto"/> : 'ロード'}
                 </button>
-                {statusMsg && (
-                    <div className={`text-xs font-bold mt-2 p-2 rounded ${statusMsg.startsWith('エラー') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                        {statusMsg}
-                    </div>
-                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -451,14 +484,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="text-center p-4 bg-slate-50 rounded mb-4 relative overflow-hidden">
                    <div className="text-xs text-slate-500 uppercase">現在の問題</div>
                    <div className="text-xl font-bold text-slate-800">第 {state.currentQuestionIndex + 1} 問</div>
-                   <div className="text-sm text-slate-600 truncate">{currentQ.text}</div>
+                   <div className="text-sm text-slate-600 truncate">{currentQ?.text || 'Error'}</div>
                    
                    {isFinalQuestion && state.gameState !== GameState.FINAL_RESULT && (
                      <div className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold px-2 py-1">FINAL</div>
                    )}
                 </div>
 
-                {/* Global Options: Always visible when questions are loaded */}
+                {/* Global Options */}
                 <div className="mb-4">
                     <button 
                         onClick={toggleHideBelowTop3}
@@ -546,7 +579,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                            </label>
                         ) : (
                            <div className="flex flex-col gap-2 h-20 justify-center">
-                              <div className="text-xs truncate font-bold text-slate-700" title={slot.file?.name}>
+                              <div className="text-xs truncate font-bold text-slate-700" title={slot.file?.name || 'File'}>
                                  {slot.file?.name}
                               </div>
                               <div className="flex gap-1 justify-center">
@@ -568,7 +601,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   ))}
                </div>
                <div className="px-4 pb-2 text-[10px] text-slate-400 text-right">
-                  ※ PC内のファイルを一時的に読み込みます。リロードするとリセットされます。
+                  ※ PC内のファイルを一時的に読み込みます。
                </div>
             </div>
 
@@ -615,7 +648,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         sortedPlayers.map((player, index) => {
                             const hasAns = player.lastAnswerIndex !== null && player.lastAnswerIndex !== undefined;
                             // Check correctness if needed (only during result)
-                            const isCorrect = state.gameState === GameState.PLAYING_RESULT && player.lastAnswerIndex === state.questions[state.currentQuestionIndex].correctIndex;
+                            const isCorrect = state.gameState === GameState.PLAYING_RESULT && player.lastAnswerIndex === state.questions[state.currentQuestionIndex]?.correctIndex;
                             const totalSec = ((player.totalResponseTime || 0) / 1000).toFixed(1);
 
                             return (
@@ -624,10 +657,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 <div className="flex items-center gap-2">
                                     <span className="w-5 text-slate-400 text-xs">{index + 1}</span>
                                     <div className={`w-2 h-2 rounded-full ${player.isOnline !== false ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                                    {player.name}
+                                    {player.name || 'No Name'}
                                 </div>
                                 </td>
-                                <td className="p-3 font-mono font-bold text-indigo-600">{player.score}</td>
+                                <td className="p-3 font-mono font-bold text-indigo-600">{player.score || 0}</td>
                                 <td className="p-3 font-mono text-xs text-slate-500 flex items-center gap-1">
                                     <Clock size={12}/> {totalSec}s
                                 </td>
@@ -665,13 +698,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </table>
                 </div>
                 <div className="p-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 flex justify-between">
-                    <span>現在の回答率: {Math.round((answeredCount / (Array.isArray(state.players) ? state.players.length : 1)) * 100)}%</span>
-                    <span>Room: {state.roomCode}</span>
+                    <span>回答率: {Math.round((answeredCount / (Array.isArray(state.players) ? state.players.length : 1)) * 100)}%</span>
                 </div>
             </div>
         </div>
 
       </main>
+
+      {/* DEBUG LOG CONSOLE (Sticky Bottom) */}
+      <div className="fixed bottom-0 left-0 right-0 h-24 bg-black text-green-400 p-2 font-mono text-[10px] overflow-y-auto border-t-2 border-green-700 z-50 opacity-80">
+          <div className="flex items-center gap-2 mb-1 sticky top-0 bg-black/90 p-1 border-b border-green-900">
+              <Terminal size={12}/> System Logs
+          </div>
+          {logs.length === 0 && <span className="opacity-50">No logs...</span>}
+          {logs.map((log, i) => (
+              <div key={i}>{log}</div>
+          ))}
+      </div>
     </div>
   );
 };
