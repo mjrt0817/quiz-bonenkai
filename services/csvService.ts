@@ -3,20 +3,19 @@ import { QuizQuestion } from "../types";
 export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> => {
   let csvUrl = inputUrl.trim();
 
-  // --- 1. Google Sheets URL Handling ---
+  // --- 1. Google Sheets URL Normalization ---
   // If the URL already contains 'output=csv' or 'format=csv', we assume it's a direct download link
-  // (e.g. "Published to Web" links like .../d/e/2PAC.../pub?output=csv)
   const isDirectCsvLink = csvUrl.includes('output=csv') || csvUrl.includes('format=csv');
 
   if (!isDirectCsvLink) {
     // Detects standard Google Sheets URLs and converts them to CSV export URLs.
-    // Example: https://docs.google.com/spreadsheets/d/ABC123_ID/edit#gid=0 -> https://docs.google.com/spreadsheets/d/ABC123_ID/export?format=csv
-    const googleSheetRegex = /docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
+    // Standard ID format is usually long alphanumeric. Avoid matching "e" in "/d/e/..."
+    // Valid: .../d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
+    const googleSheetRegex = /docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]{15,})/;
     const match = csvUrl.match(googleSheetRegex);
     
     if (match && match[1]) {
       const sheetId = match[1];
-      // Attempt to preserve the sheet GID if present
       let gidParam = '';
       try {
         const urlObj = new URL(csvUrl);
@@ -25,36 +24,63 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
           gidParam = `&gid=${gid}`;
         }
       } catch (e) {
-        // Ignore URL parsing errors for partial inputs
+        // Ignore URL parsing errors
       }
-      
       csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv${gidParam}`;
       console.log("Converted to CSV URL:", csvUrl);
     }
-  } else {
-      console.log("Using direct CSV URL:", csvUrl);
+    // Note: Links like .../d/e/2PAC.../pubhtml should ideally use the direct link provided by "Publish to Web" > "CSV"
   }
 
+  // --- 2. Fetching Data with CORS Handling ---
+  let text = '';
   try {
+    console.log("Fetching CSV from:", csvUrl);
     const response = await fetch(csvUrl);
     
+    // Check if redirect to login page or error
     if (!response.ok) {
-      if (response.status === 404) throw new Error("ファイルが見つかりません (404)。URLを確認してください。");
-      if (response.status === 401 || response.status === 403) throw new Error("アクセス権限がありません。「リンクを知っている全員」に公開設定してください。");
-      throw new Error(`ダウンロード失敗: ${response.status} ${response.statusText}`);
+        throw new Error(`HTTP Error: ${response.status}`);
     }
-
-    // Check for HTML response (common mistake when URL is wrong)
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("text/html")) {
-      throw new Error("CSVではなくHTMLが返されました。URLが正しいか、または「ウェブに公開」設定で「CSV形式」が選択されているか確認してください。");
+        throw new Error("HTML_RESPONSE"); 
+    }
+    
+    text = await response.text();
+    
+    // Double check text content for HTML doctype just in case
+    if (text.trim().toLowerCase().startsWith("<!doctype html")) {
+        throw new Error("HTML_RESPONSE");
     }
 
-    const text = await response.text();
+  } catch (error: any) {
+    console.warn("Direct fetch failed or returned HTML. Trying CORS proxy...", error);
+    
+    // If it was an HTML response from Google, proxy might not help if permissions are wrong, but worth a try for CORS issues.
+    // Fallback: Use a CORS proxy
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(csvUrl)}`;
+    
+    try {
+        const proxyResponse = await fetch(proxyUrl);
+        if (!proxyResponse.ok) throw new Error(`Proxy Error: ${proxyResponse.status}`);
+        
+        text = await proxyResponse.text();
+        
+        if (text.trim().toLowerCase().startsWith("<!doctype html") || text.includes("Google Accounts")) {
+             throw new Error("Googleスプレッドシートの読み込みに失敗しました。URLが「リンクを知っている全員」に公開されているか、または「ウェブに公開」設定で「CSV形式」が選択されているか確認してください。");
+        }
+    } catch (proxyError: any) {
+        throw new Error(`CSVの読み込みに失敗しました: ${error.message || 'Network Error'}`);
+    }
+  }
+
+  // --- 3. Parsing CSV ---
+  try {
     const lines = text.split('\n');
     const questions: QuizQuestion[] = [];
 
-    // Helper to parse CSV line handling quotes
+    // Simple CSV Line Parser handling quotes
     const parseLine = (line: string) => {
       const result = [];
       let cell = '';
@@ -75,42 +101,41 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
       return result.map(c => c.replace(/^"|"$/g, '').replace(/""/g, '"'));
     };
 
-    // Skip header (index 0) and process rows
+    // Process rows (Skip header index 0)
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
       const cols = parseLine(line);
       
-      // Determine format based on column count
-      // A:Text, B-E:Opts, F-I:Imgs, J:Correct, K:Exp
-      
-      // We need at least Question + 4 Options (5 cols)
+      // Need at least Question + 4 Options (5 cols)
       if (cols.length < 5) continue;
 
       let correctIndex = 0;
       let explanation = "";
       let optionImages: string[] = [];
 
-      // Logic to detect format (With Images vs Without Images)
-      // New Format (With Images) usually has > 9 columns if images are used, or at least placeholders.
-      // Standard Format: Q, O1, O2, O3, O4, Correct, Exp
-      // Image Format:    Q, O1, O2, O3, O4, I1, I2, I3, I4, Correct, Exp
+      // Detection: Image Format vs Standard Format
+      // Image Format usually has 11 columns: Q, O1-O4, I1-I4, Correct, Exp
+      // But user might not fill all. Check if Col 9 (J) is a number (1-4).
       
-      // Heuristic: Check if column 9 (J) is a number (Correct Index for Image Format)
-      const isImageFormat = cols.length >= 10 && !isNaN(parseInt(cols[9], 10));
+      // Check column J (index 9) for correct answer index
+      const colJ = cols[9] ? parseInt(cols[9], 10) : NaN;
+      // Check column F (index 5) for correct answer index (Standard format)
+      const colF = cols[5] ? parseInt(cols[5], 10) : NaN;
+
+      const isImageFormat = cols.length >= 7 && !isNaN(colJ);
 
       if (isImageFormat) {
-         // NEW FORMAT
+         // NEW FORMAT with Images
+         // F, G, H, I are images
          optionImages = [cols[5] || "", cols[6] || "", cols[7] || "", cols[8] || ""];
-         const correctNum = parseInt(cols[9], 10);
-         correctIndex = isNaN(correctNum) ? 0 : correctNum - 1;
+         correctIndex = isNaN(colJ) ? 0 : colJ - 1;
          explanation = cols[10] || "解説はありません";
       } else {
-         // OLD FORMAT fallback
-         // Try to find correct index at col 5
-         const correctNum = parseInt(cols[5], 10);
-         correctIndex = isNaN(correctNum) ? 0 : correctNum - 1;
+         // OLD FORMAT
+         // F is Correct Index
+         correctIndex = isNaN(colF) ? 0 : colF - 1;
          explanation = cols[6] || "解説はありません";
       }
 
@@ -119,16 +144,17 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
         text: cols[0] || "無題の問題",
         options: [cols[1] || "", cols[2] || "", cols[3] || "", cols[4] || ""],
         optionImages: optionImages.some(img => img && img.trim() !== "") ? optionImages : undefined,
-        correctIndex: Math.max(0, Math.min(3, correctIndex)), // Ensure 0-3 range
+        correctIndex: Math.max(0, Math.min(3, correctIndex)), // Bound to 0-3
         explanation: explanation
       });
     }
 
     if (questions.length === 0) {
-      throw new Error("有効な問題が見つかりませんでした。列の形式を確認してください。");
+      throw new Error("有効な問題データが見つかりませんでした。CSVの列形式を確認してください。");
     }
 
     return questions;
+
   } catch (error) {
     console.error("CSV Parse Error:", error);
     throw error;
