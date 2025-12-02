@@ -10,6 +10,7 @@ export interface QuizQuestion {
   id: string;
   text: string;
   options: string[];
+  optionImages?: string[]; // Array of image URLs for options (optional)
   correctIndex: number;
   explanation: string;
 }
