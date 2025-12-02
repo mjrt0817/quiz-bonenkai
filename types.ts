@@ -36,6 +36,7 @@ export interface HostState {
   isRankingResultVisible: boolean; // Controls whether the current stage result is revealed (true) or hidden/suspense (false)
   hideBelowTop3: boolean; // Option to hide ranks 4 and below
   quizTitle: string; // Tournament Title
+  titleImage?: string | null; // Base64 image data for the lobby screen
 }
 
 export const COLORS = [
