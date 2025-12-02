@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -67,6 +67,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         return a.name.localeCompare(b.name);
     });
   }, [state.players]);
+
+  // --- Image Upload Function ---
+  const handleTitleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 1024) { // 1MB limit check
+          alert("画像サイズが大きすぎます。1MB以下の画像を選択してください。");
+          return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64 = ev.target?.result as string;
+        updateState(prev => ({ ...prev, titleImage: base64 }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearTitleImage = () => {
+    updateState(prev => ({ ...prev, titleImage: null }));
+  };
+
 
   // --- Sound Board Functions ---
   const handleFileSelect = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -331,7 +353,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
             <h2 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-700"><RefreshCw size={20}/> クイズ読み込み</h2>
             {state.questions.length === 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500">大会タイトル</label>
                   <div className="flex items-center gap-2">
@@ -345,7 +367,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     />
                   </div>
                 </div>
+
                 <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500">大会ロゴ/画像 (任意)</label>
+                  <div className="flex items-center gap-2">
+                    {!state.titleImage ? (
+                      <label className="flex items-center justify-center w-full p-2 border-2 border-dashed rounded cursor-pointer hover:bg-slate-50 text-slate-500 text-xs gap-2">
+                          <ImageIcon size={16}/> <span>画像を選択 (Max 1MB)</span>
+                          <input type="file" accept="image/*" className="hidden" onChange={handleTitleImageUpload} />
+                      </label>
+                    ) : (
+                      <div className="flex items-center justify-between w-full p-2 border rounded bg-slate-50">
+                          <span className="text-xs text-green-600 font-bold flex items-center gap-1"><ImageIcon size={14}/> 画像セット済み</span>
+                          <button onClick={clearTitleImage} className="text-red-500 hover:text-red-700"><X size={16}/></button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-1 border-t pt-3">
                   <label className="text-xs font-bold text-slate-500">CSV URL</label>
                   <input 
                     type="text" 
