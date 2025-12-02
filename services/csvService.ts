@@ -155,7 +155,7 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
 
     return questions;
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("CSV Parse Error:", error);
     throw error;
   }
