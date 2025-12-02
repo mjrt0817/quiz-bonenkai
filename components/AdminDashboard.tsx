@@ -160,7 +160,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const loadQuestions = async () => {
     if (!csvUrl) return;
     setIsLoading(true);
-    setStatusMsg('読み込み中...');
+    setStatusMsg('読み込み中... (プロキシ経由で試行します)');
+    
     try {
       const questions = await parseCSVQuiz(csvUrl);
       
@@ -182,8 +183,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }));
       setStatusMsg(`成功！ ${questions.length}問ロード完了`);
     } catch (err: any) {
-      console.error(err);
-      setStatusMsg(`エラー: ${err.message}`);
+      console.error("Load Error:", err);
+      // Safe error message
+      const msg = err instanceof Error ? err.message : String(err);
+      setStatusMsg(`エラー: ${msg}`);
     } finally {
       setIsLoading(false);
     }
