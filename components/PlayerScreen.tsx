@@ -125,6 +125,8 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
 
   // --- 3. PLAYING: QUESTION ---
   if (state.gameState === GameState.PLAYING_QUESTION) {
+    const currentQuestion = state.questions[state.currentQuestionIndex];
+
     if (hasAnswered) {
        return (
          <div className="h-full bg-slate-800 flex flex-col items-center justify-center p-6 text-white">
@@ -157,18 +159,33 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
         </div>
 
         <div className="flex-1 grid grid-cols-2 gap-4 content-center">
-           {state.questions[state.currentQuestionIndex]?.options.map((opt, idx) => (
-             <button
-               key={idx}
-               onClick={() => onAnswer(idx)}
-               className={`${COLORS[idx]} w-full min-h-[140px] rounded-2xl shadow-lg flex flex-col items-center justify-center p-4 gap-2 active:scale-95 transition-transform`}
-             >
-               <div className="w-10 h-10 bg-black/20 rounded-full flex items-center justify-center font-bold text-white text-xl">
-                 {BTN_LABELS[idx]}
-               </div>
-               <span className="text-white font-bold text-lg text-center leading-tight line-clamp-3 break-words w-full">{opt}</span>
-             </button>
-           ))}
+           {currentQuestion?.options.map((opt, idx) => {
+             const imgUrl = currentQuestion.optionImages?.[idx];
+             return (
+              <button
+                key={idx}
+                onClick={() => onAnswer(idx)}
+                className={`${COLORS[idx]} w-full min-h-[140px] rounded-2xl shadow-lg flex flex-col items-center justify-center p-2 gap-2 active:scale-95 transition-transform overflow-hidden relative`}
+              >
+                <div className="absolute left-2 top-2 w-8 h-8 bg-black/20 rounded-full flex items-center justify-center font-bold text-white text-sm z-10">
+                  {BTN_LABELS[idx]}
+                </div>
+                
+                {imgUrl ? (
+                    // Image Mode
+                    <>
+                        <div className="flex-1 w-full bg-white rounded-lg overflow-hidden relative">
+                             <img src={imgUrl} alt="" className="absolute inset-0 w-full h-full object-contain" />
+                        </div>
+                        <span className="text-white font-bold text-sm text-center line-clamp-2 w-full">{opt}</span>
+                    </>
+                ) : (
+                    // Text Mode
+                    <span className="text-white font-bold text-lg text-center leading-tight line-clamp-3 break-words w-full px-2">{opt}</span>
+                )}
+              </button>
+             );
+           })}
         </div>
       </div>
     );
