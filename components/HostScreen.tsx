@@ -84,9 +84,17 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
         {/* 1. LOBBY SCREEN */}
         {(state.gameState === GameState.SETUP || state.gameState === GameState.LOBBY) && (
           <div className="absolute inset-0 flex flex-col items-center justify-start pt-10 p-6">
-            <h2 className="text-4xl md:text-5xl font-black mb-4 text-center text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
-              参加者募集中
-            </h2>
+            
+            {/* Title Image or Text */}
+            {state.titleImage ? (
+                <div className="mb-4 max-h-[120px] md:max-h-[160px] flex justify-center">
+                    <img src={state.titleImage} alt="Tournament Title" className="h-full object-contain drop-shadow-lg" />
+                </div>
+            ) : (
+                <h2 className="text-4xl md:text-5xl font-black mb-4 text-center text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+                参加者募集中
+                </h2>
+            )}
             
             <div className="flex flex-col md:flex-row items-center gap-8 mb-8 bg-slate-800/50 p-6 rounded-3xl border border-slate-700">
               <div className="bg-white p-2 rounded-xl shadow-2xl">
