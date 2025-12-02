@@ -64,7 +64,7 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
       // This ensures redundancy and consistency
       if (role === 'HOST' || role === 'ADMIN') {
          const statePlayersRef = db.ref(`rooms/${ROOM_ID}/state/players`);
-         statePlayersRef.set(playersList).catch(err => console.error("Sync players failed", err));
+         statePlayersRef.set(playersList).catch((err: any) => console.error("Sync players failed", err));
       }
     };
 
@@ -85,7 +85,7 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     setHostState(prev => {
       const newState = updater(prev);
       const stateRef = db.ref(`rooms/${ROOM_ID}/state`);
-      stateRef.set(newState).catch(err => console.error("Firebase update failed", err));
+      stateRef.set(newState).catch((err: any) => console.error("Firebase update failed", err));
       return newState;
     });
   }, [role]);
