@@ -30,6 +30,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [titleInput, setTitleInput] = useState(state.quizTitle || 'クイズ大会');
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
+  const [debugError, setDebugError] = useState<string | null>(null);
 
   // Helper to add log
   const addLog = (msg: string) => {
@@ -84,13 +85,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             const nameB = b.name ? String(b.name) : '';
             return nameA.localeCompare(nameB);
         });
-    } catch (e) {
+    } catch (e: any) {
         console.error("Sort error", e);
+        setDebugError(`Sort Error: ${e.message}`);
         return [];
     }
   }, [state.players]);
 
-  const answeredCount = state.players.filter(p => p && p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
+  // SAFELY calculate answered count. 
+  // CRITICAL FIX: Ensure state.players is an array before filtering
+  const answeredCount = useMemo(() => {
+    try {
+        const list = Array.isArray(state.players) ? state.players : [];
+        return list.filter(p => p && p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
+    } catch (e) {
+        return 0;
+    }
+  }, [state.players]);
 
   // --- Image Upload Function ---
   const handleTitleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,45 +147,49 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const togglePlaySound = (index: number) => {
     try {
         const slot = soundSlots[index];
-        const audio = audioRefs.current[index];
         
         if (!slot.url) return;
 
+        let audio = audioRefs.current[index];
+
         if (!audio || audio.src !== slot.url) {
-        // First time init or file changed
-        const newAudio = new Audio(slot.url);
-        newAudio.volume = slot.volume;
-        newAudio.loop = slot.isLoop;
-        
-        newAudio.onended = () => {
-            if (!newAudio.loop) {
+            // First time init or file changed
+            const newAudio = new Audio(slot.url);
+            newAudio.volume = slot.volume;
+            newAudio.loop = slot.isLoop;
+            
+            newAudio.onended = () => {
+                if (!newAudio.loop) {
+                    setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
+                }
+            };
+            
+            newAudio.onerror = (e) => {
+                console.error("Audio error", e);
+                addLog(`Slot #${index + 1} Error: 再生できませんでした`);
                 setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-            }
-        };
-        
-        newAudio.onerror = (e) => {
-            console.error("Audio error", e);
-            addLog(`Slot #${index + 1} Error: 再生できませんでした`);
-            setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-        };
-        
-        audioRefs.current[index] = newAudio;
-        newAudio.play().catch(e => {
-            console.error("Play error", e);
-            addLog(`Slot #${index + 1} Play Error: ${e.message}`);
-        });
-        setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
-        } else {
+            };
+            
+            audioRefs.current[index] = newAudio;
+            audio = newAudio;
+        }
+
         if (slot.isPlaying) {
-            // Restart
+            // Restart if already playing (Pon-dashi style)
             audio.currentTime = 0;
-            audio.play().catch(e => console.error(e));
+            audio.play().catch(e => {
+                 console.error("Play error", e);
+                 addLog(`Play Error: ${e.message}`);
+            });
         } else {
-            // Resume/Start
-            audio.play().catch(e => console.error(e));
+            // Start
+            audio.play().catch(e => {
+                console.error("Play error", e);
+                addLog(`Play Error: ${e.message}`);
+            });
             setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
         }
-        }
+        
     } catch (e: any) {
         addLog(`Sound Error: ${e.message}`);
     }
@@ -698,7 +713,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </table>
                 </div>
                 <div className="p-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 flex justify-between">
-                    <span>回答率: {Math.round((answeredCount / (Array.isArray(state.players) ? state.players.length : 1)) * 100)}%</span>
+                    <span>回答率: {Math.round((answeredCount / (Array.isArray(state.players) && state.players.length > 0 ? state.players.length : 1)) * 100)}%</span>
                 </div>
             </div>
         </div>
@@ -710,6 +725,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="flex items-center gap-2 mb-1 sticky top-0 bg-black/90 p-1 border-b border-green-900">
               <Terminal size={12}/> System Logs
           </div>
+          {debugError && <div className="text-red-500 bg-red-900/50 p-1 mb-1">{debugError}</div>}
           {logs.length === 0 && <span className="opacity-50">No logs...</span>}
           {logs.map((log, i) => (
               <div key={i}>{log}</div>
