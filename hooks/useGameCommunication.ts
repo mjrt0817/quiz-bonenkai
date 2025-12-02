@@ -36,11 +36,12 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
       const data = snapshot.val();
       if (data) {
         // Ensure players is always an array, even if Firebase returns an object map
+        // AND clean up null/undefined values to prevent crashes
         let safePlayers: Player[] = [];
         if (Array.isArray(data.players)) {
-            safePlayers = data.players;
+            safePlayers = data.players.filter((p: any) => p && typeof p === 'object');
         } else if (data.players && typeof data.players === 'object') {
-            safePlayers = Object.values(data.players) as Player[];
+            safePlayers = Object.values(data.players).filter((p: any) => p && typeof p === 'object') as Player[];
         }
 
         setHostState({
@@ -62,7 +63,8 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     
     const handlePlayersChange = (snap: any) => {
       const playersObj = snap.val() || {};
-      const playersList = Object.values(playersObj) as Player[];
+      // Also filter nulls here
+      const playersList = (Object.values(playersObj) as Player[]).filter(p => p && typeof p === 'object');
       
       // Update local state with latest players
       setHostState(prev => ({ ...prev, players: playersList }));
@@ -103,7 +105,9 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     
     const updates: any = {};
     hostState.players.forEach(p => {
-        updates[`rooms/${ROOM_ID}/players/${p.id}/lastAnswerIndex`] = null;
+        if(p && p.id) {
+           updates[`rooms/${ROOM_ID}/players/${p.id}/lastAnswerIndex`] = null;
+        }
     });
     if (Object.keys(updates).length > 0) {
         await db.ref().update(updates);
@@ -116,9 +120,11 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
 
     const updates: any = {};
     hostState.players.forEach(p => {
-        updates[`rooms/${ROOM_ID}/players/${p.id}/score`] = 0;
-        updates[`rooms/${ROOM_ID}/players/${p.id}/lastAnswerIndex`] = null;
-        updates[`rooms/${ROOM_ID}/players/${p.id}/totalResponseTime`] = 0;
+        if(p && p.id) {
+            updates[`rooms/${ROOM_ID}/players/${p.id}/score`] = 0;
+            updates[`rooms/${ROOM_ID}/players/${p.id}/lastAnswerIndex`] = null;
+            updates[`rooms/${ROOM_ID}/players/${p.id}/totalResponseTime`] = 0;
+        }
     });
     if (Object.keys(updates).length > 0) {
         await db.ref().update(updates);
@@ -134,6 +140,8 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     const updates: any = {};
     
     hostState.players.forEach(p => {
+      if(!p || !p.id) return;
+
       // Calculate Time Difference (Tie Breaker)
       // We accumulate time taken for ALL answers (or you could restrict to only correct ones)
       // Here we accumulate time for any answer submitted to break ties based on "speed of participation"
@@ -176,9 +184,9 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     const playersRef = db.ref(`rooms/${ROOM_ID}/players`);
     const snapshot = await playersRef.once('value');
     const playersObj = snapshot.val() || {};
-    const playersList = Object.values(playersObj) as Player[];
+    const playersList = (Object.values(playersObj) as Player[]).filter(p => p);
     
-    const existingPlayer = playersList.find(p => p.name === name);
+    const existingPlayer = playersList.find(p => p && p.name === name);
 
     let targetId = playerId;
 
