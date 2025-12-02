@@ -1,5 +1,5 @@
-import { initializeApp } from "firebase/app";
-import { getDatabase } from "firebase/database";
+import firebase from "firebase/compat/app";
+import "firebase/compat/database";
 
 // TODO: 忘年会本番用: 以下の値をFirebaseコンソールからコピーして書き換えてください
 // 手順: Firebase Console -> プロジェクトの設定 -> マイアプリ -> SDKの設定と構成
@@ -13,8 +13,8 @@ const firebaseConfig = {
   appId: "1:425590911798:web:7cd73742a67122e2f83997"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+// Initialize Firebase using compat API
+const app = firebase.initializeApp(firebaseConfig);
+const db = app.database() as any;
 
 export { db };
