@@ -37,6 +37,7 @@ export interface HostState {
   hideBelowTop3: boolean; // Option to hide ranks 4 and below
   quizTitle: string; // Tournament Title
   titleImage?: string | null; // Base64 image data for the lobby screen
+  isLobbyDetailsVisible: boolean; // Controls if QR/Players are shown in lobby or just the title image
 }
 
 export const COLORS = [
