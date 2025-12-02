@@ -37,19 +37,41 @@ export const parseCSVQuiz = async (csvUrl: string): Promise<QuizQuestion[]> => {
 
       const cols = parseLine(line);
       
-      // Validate column count (approx 7 columns based on user spec)
-      // 0:Question, 1:Opt1, 2:Opt2, 3:Opt3, 4:Opt4, 5:CorrectIndex(1-4), 6:Explanation
+      // Determine format based on column count
+      // Old Format: 0:Q, 1-4:Opts, 5:Correct, 6:Exp (Length ~7)
+      // New Format: 0:Q, 1-4:Opts, 5-8:Images, 9:Correct, 10:Exp (Length ~11)
+      
       if (cols.length < 7) continue;
 
-      const correctNum = parseInt(cols[5], 10);
-      const correctIndex = isNaN(correctNum) ? 0 : correctNum - 1; // Convert 1-based to 0-based
+      let correctIndex = 0;
+      let explanation = "";
+      let optionImages: string[] = [];
+
+      // Check if column 9 exists and looks like the correct index (New Format)
+      // Or if column 5 looks like correct index (Old Format)
+      
+      // Note: We prioritize the New Format structure if enough columns exist
+      if (cols.length >= 10 && !isNaN(parseInt(cols[9], 10))) {
+         // NEW FORMAT
+         // 5,6,7,8 are images
+         optionImages = [cols[5], cols[6], cols[7], cols[8]];
+         const correctNum = parseInt(cols[9], 10);
+         correctIndex = isNaN(correctNum) ? 0 : correctNum - 1;
+         explanation = cols[10] || "解説はありません";
+      } else {
+         // OLD FORMAT fallback
+         const correctNum = parseInt(cols[5], 10);
+         correctIndex = isNaN(correctNum) ? 0 : correctNum - 1;
+         explanation = cols[6] || "解説はありません";
+      }
 
       questions.push({
         id: `csv-${Date.now()}-${i}`,
         text: cols[0],
         options: [cols[1], cols[2], cols[3], cols[4]],
+        optionImages: optionImages.some(img => img !== "") ? optionImages : undefined,
         correctIndex: Math.max(0, Math.min(3, correctIndex)), // Ensure 0-3 range
-        explanation: cols[6] || "解説はありません"
+        explanation: explanation
       });
     }
 
