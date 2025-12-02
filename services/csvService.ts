@@ -3,28 +3,36 @@ import { QuizQuestion } from "../types";
 export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> => {
   let csvUrl = inputUrl.trim();
 
-  // --- 1. Google Sheets URL Automatic Conversion ---
-  // Detects standard Google Sheets URLs and converts them to CSV export URLs.
-  // Example: https://docs.google.com/spreadsheets/d/ABC123_ID/edit#gid=0 -> https://docs.google.com/spreadsheets/d/ABC123_ID/export?format=csv
-  const googleSheetRegex = /docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
-  const match = csvUrl.match(googleSheetRegex);
-  
-  if (match && match[1]) {
-    const sheetId = match[1];
-    // Attempt to preserve the sheet GID if present
-    let gidParam = '';
-    try {
-      const urlObj = new URL(csvUrl);
-      const gid = urlObj.searchParams.get('gid');
-      if (gid) {
-        gidParam = `&gid=${gid}`;
-      }
-    } catch (e) {
-      // Ignore URL parsing errors for partial inputs
-    }
+  // --- 1. Google Sheets URL Handling ---
+  // If the URL already contains 'output=csv' or 'format=csv', we assume it's a direct download link
+  // (e.g. "Published to Web" links like .../d/e/2PAC.../pub?output=csv)
+  const isDirectCsvLink = csvUrl.includes('output=csv') || csvUrl.includes('format=csv');
+
+  if (!isDirectCsvLink) {
+    // Detects standard Google Sheets URLs and converts them to CSV export URLs.
+    // Example: https://docs.google.com/spreadsheets/d/ABC123_ID/edit#gid=0 -> https://docs.google.com/spreadsheets/d/ABC123_ID/export?format=csv
+    const googleSheetRegex = /docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
+    const match = csvUrl.match(googleSheetRegex);
     
-    csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv${gidParam}`;
-    console.log("Converted to CSV URL:", csvUrl);
+    if (match && match[1]) {
+      const sheetId = match[1];
+      // Attempt to preserve the sheet GID if present
+      let gidParam = '';
+      try {
+        const urlObj = new URL(csvUrl);
+        const gid = urlObj.searchParams.get('gid');
+        if (gid) {
+          gidParam = `&gid=${gid}`;
+        }
+      } catch (e) {
+        // Ignore URL parsing errors for partial inputs
+      }
+      
+      csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv${gidParam}`;
+      console.log("Converted to CSV URL:", csvUrl);
+    }
+  } else {
+      console.log("Using direct CSV URL:", csvUrl);
   }
 
   try {
@@ -39,7 +47,7 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
     // Check for HTML response (common mistake when URL is wrong)
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("text/html")) {
-      throw new Error("CSVではなくHTMLが返されました。「ウェブに公開」から「CSV形式」を選択したURLを使用するか、スプレッドシートのURLを正しく入力してください。");
+      throw new Error("CSVではなくHTMLが返されました。URLが正しいか、または「ウェブに公開」設定で「CSV形式」が選択されているか確認してください。");
     }
 
     const text = await response.text();
