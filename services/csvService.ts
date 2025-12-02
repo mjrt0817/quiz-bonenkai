@@ -9,8 +9,6 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
 
   if (!isDirectCsvLink) {
     // Detects standard Google Sheets URLs and converts them to CSV export URLs.
-    // Standard ID format is usually long alphanumeric. Avoid matching "e" in "/d/e/..."
-    // Valid: .../d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
     const googleSheetRegex = /docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]{15,})/;
     const match = csvUrl.match(googleSheetRegex);
     
@@ -26,10 +24,11 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
       } catch (e) {
         // Ignore URL parsing errors
       }
+      // If it looks like a published html link, we might not be able to simply convert. 
+      // But standard edit links convert well.
       csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv${gidParam}`;
       console.log("Converted to CSV URL:", csvUrl);
     }
-    // Note: Links like .../d/e/2PAC.../pubhtml should ideally use the direct link provided by "Publish to Web" > "CSV"
   }
 
   // --- 2. Fetching Data with CORS Handling ---
@@ -38,18 +37,17 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
     console.log("Fetching CSV from:", csvUrl);
     const response = await fetch(csvUrl);
     
-    // Check if redirect to login page or error
     if (!response.ok) {
         throw new Error(`HTTP Error: ${response.status}`);
     }
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("text/html")) {
+        // This usually happens when the sheet is not published properly or requires login
         throw new Error("HTML_RESPONSE"); 
     }
     
     text = await response.text();
     
-    // Double check text content for HTML doctype just in case
     if (text.trim().toLowerCase().startsWith("<!doctype html")) {
         throw new Error("HTML_RESPONSE");
     }
@@ -57,8 +55,7 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
   } catch (error: any) {
     console.warn("Direct fetch failed or returned HTML. Trying CORS proxy...", error);
     
-    // If it was an HTML response from Google, proxy might not help if permissions are wrong, but worth a try for CORS issues.
-    // Fallback: Use a CORS proxy
+    // Fallback: Use a CORS proxy (corsproxy.io is reliable for this)
     const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(csvUrl)}`;
     
     try {
@@ -117,7 +114,7 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
 
       // Detection: Image Format vs Standard Format
       // Image Format usually has 11 columns: Q, O1-O4, I1-I4, Correct, Exp
-      // But user might not fill all. Check if Col 9 (J) is a number (1-4).
+      // Standard Format has 7 columns: Q, O1-O4, Correct, Exp
       
       // Check column J (index 9) for correct answer index
       const colJ = cols[9] ? parseInt(cols[9], 10) : NaN;
