@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, Player, BTN_LABELS, COLORS } from '../types';
-import { User, Loader, Check, X, Trophy, LogOut, AlertCircle, Sparkles, Lock, Medal, AlertTriangle, PartyPopper } from 'lucide-react';
+import { User, Loader, Check, X, Trophy, LogOut, AlertTriangle, Sparkles, Lock, Medal, PartyPopper } from 'lucide-react';
 
 interface PlayerScreenProps {
   state: HostState;
@@ -175,7 +175,12 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
                     // Image Mode
                     <>
                         <div className="flex-1 w-full bg-white rounded-lg overflow-hidden relative">
-                             <img src={imgUrl} alt="" className="absolute inset-0 w-full h-full object-contain" />
+                             <img 
+                                src={imgUrl} 
+                                alt="" 
+                                className="absolute inset-0 w-full h-full object-contain" 
+                                referrerPolicy="no-referrer"
+                             />
                         </div>
                         <span className="text-white font-bold text-sm text-center line-clamp-2 w-full">{opt}</span>
                     </>
