@@ -72,6 +72,25 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
     }
   }
 
+  // --- Helper: Convert Google Drive Links to Direct Links ---
+  const convertToDirectLink = (url: string | undefined): string => {
+    if (!url) return "";
+    const trimmed = url.trim();
+    if (!trimmed) return "";
+
+    // Regex to detect Google Drive File View links
+    // e.g., https://drive.google.com/file/d/123456789/view?usp=sharing
+    const driveRegex = /drive\.google\.com\/(?:file\/d\/|open\?id=)([-a-zA-Z0-9_]+)/;
+    const match = trimmed.match(driveRegex);
+    
+    if (match && match[1]) {
+      // Use lh3.googleusercontent.com for more reliable image embedding
+      // This bypasses some of the 403 Forbidden issues with drive.google.com/uc
+      return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    }
+    return trimmed;
+  };
+
   // --- 3. Parsing CSV ---
   try {
     const lines = text.split('\n');
@@ -126,7 +145,9 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
       if (isImageFormat) {
          // NEW FORMAT with Images
          // F, G, H, I are images
-         optionImages = [cols[5] || "", cols[6] || "", cols[7] || "", cols[8] || ""];
+         const rawImages = [cols[5], cols[6], cols[7], cols[8]];
+         optionImages = rawImages.map(convertToDirectLink);
+         
          correctIndex = isNaN(colJ) ? 0 : colJ - 1;
          explanation = cols[10] || "解説はありません";
       } else {
@@ -140,7 +161,9 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
         id: `csv-${Date.now()}-${i}`,
         text: cols[0] || "無題の問題",
         options: [cols[1] || "", cols[2] || "", cols[3] || "", cols[4] || ""],
-        optionImages: optionImages.some(img => img && img.trim() !== "") ? optionImages : undefined,
+        // Sanitization: If no valid image links exist in the array, use undefined to keep clean state
+        // Also ensure individual array items are empty strings rather than undefined/null if they are blanks
+        optionImages: optionImages.some(img => img !== "") ? optionImages : undefined,
         correctIndex: Math.max(0, Math.min(3, correctIndex)), // Bound to 0-3
         explanation: explanation
       });
