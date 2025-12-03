@@ -50,7 +50,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   );
   
   // Refs to hold Audio objects - Initialize with array of 6 nulls
-  const audioRefs = useRef<(HTMLAudioElement | null)[]>(new Array(6).fill(null));
+  const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
+  // Ensure the array has 6 slots
+  if (audioRefs.current.length !== 6) {
+      audioRefs.current = new Array(6).fill(null);
+  }
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      soundSlots.forEach(slot => {
+        if (slot.url) URL.revokeObjectURL(slot.url);
+      });
+      audioRefs.current.forEach(audio => {
+        if (audio) {
+          audio.pause();
+          audio.src = '';
+        }
+      });
+    };
+  }, []);
 
   useEffect(() => {
     if(state.quizTitle) setTitleInput(state.quizTitle);
@@ -126,12 +145,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleFileSelect = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // 1. Stop and cleanup old audio if exists
+      const oldAudio = audioRefs.current[index];
+      if (oldAudio) {
+        oldAudio.pause();
+        oldAudio.src = '';
+        audioRefs.current[index] = null;
+      }
+
+      // 2. Cleanup old URL
+      const oldSlot = soundSlots[index];
+      if (oldSlot.url) {
+        URL.revokeObjectURL(oldSlot.url);
+      }
+      
+      // 3. Create new URL
       const url = URL.createObjectURL(file);
       
-      // Cleanup old url if exists
-      const oldSlot = soundSlots[index];
-      if (oldSlot.url) URL.revokeObjectURL(oldSlot.url);
-
       setSoundSlots(prev => prev.map((slot, i) => 
         i === index ? { ...slot, file, url, isPlaying: false } : slot
       ));
@@ -142,51 +172,53 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const togglePlaySound = (index: number) => {
     try {
         const slot = soundSlots[index];
-        
         if (!slot.url) return;
 
         let audio = audioRefs.current[index];
 
-        if (!audio || audio.src !== slot.url) {
-            // First time init or file changed
-            const newAudio = new Audio(slot.url);
-            newAudio.volume = slot.volume;
-            newAudio.loop = slot.isLoop;
-            
-            newAudio.onended = () => {
-                if (!newAudio.loop) {
-                    setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-                }
-            };
-            
-            newAudio.onerror = (e) => {
-                console.error("Audio error", e);
-                addLog(`Slot #${index + 1} Error: 再生できませんでした`);
-                setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-            };
-            
-            audioRefs.current[index] = newAudio;
-            audio = newAudio;
+        // Ensure audio instance exists
+        if (!audio) {
+            audio = new Audio(slot.url);
+            audioRefs.current[index] = audio;
         }
 
+        // Apply settings
+        audio.volume = slot.volume;
+        audio.loop = slot.isLoop;
+
+        // Setup handlers
+        audio.onended = () => {
+            if (!audio?.loop) {
+                setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
+            }
+        };
+
+        audio.onerror = (e) => {
+            console.error(`Audio error slot ${index}`, e);
+            addLog(`Slot #${index + 1} Error: 再生失敗`);
+            setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
+        };
+
         if (slot.isPlaying) {
-            // Restart if already playing (Pon-dashi style)
+            // Restart if already playing (Pon-dashi)
             audio.currentTime = 0;
             audio.play().catch(e => {
-                 console.error("Play error", e);
-                 addLog(`Play Error: ${e.message}`);
+                 console.error("Replay error", e);
+                 addLog(`Replay Error: ${e.message}`);
             });
         } else {
             // Start
             audio.play().catch(e => {
                 console.error("Play error", e);
                 addLog(`Play Error: ${e.message}`);
+                // Revert state if failed
+                setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
             });
             setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
         }
         
     } catch (e: any) {
-        addLog(`Sound Error: ${e.message}`);
+        addLog(`Sound Logic Error: ${e.message}`);
     }
   };
 
@@ -195,14 +227,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (audio) {
       audio.pause();
       audio.currentTime = 0;
-      setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
     }
+    setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
   };
 
   const toggleLoop = (index: number) => {
      setSoundSlots(prev => prev.map((s, i) => {
          if (i !== index) return s;
          const newLoop = !s.isLoop;
+         // Apply immediately if audio exists
          if (audioRefs.current[index]) {
              audioRefs.current[index]!.loop = newLoop;
          }
