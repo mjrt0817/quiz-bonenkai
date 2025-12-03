@@ -31,6 +31,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [debugError, setDebugError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'PLAYERS' | 'QUIZ'>('PLAYERS');
 
   // Helper to add log
   const addLog = (msg: string) => {
@@ -176,6 +177,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const slot = soundSlots[index];
         if (!slot.url) return;
         
+        // Safety check for ref array
         if (!audioRefs.current) return;
 
         let audio = audioRefs.current[index];
@@ -231,7 +233,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const stopSound = (index: number) => {
-    const audio = audioRefs.current[index];
+    const audio = audioRefs.current?.[index];
     if (audio) {
       audio.pause();
       audio.currentTime = 0;
@@ -244,7 +246,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
          if (i !== index) return s;
          const newLoop = !s.isLoop;
          // Apply immediately if audio exists
-         if (audioRefs.current[index]) {
+         if (audioRefs.current && audioRefs.current[index]) {
              audioRefs.current[index]!.loop = newLoop;
          }
          return { ...s, isLoop: newLoop };
@@ -667,100 +669,158 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
 
-            {/* 4. Player List */}
+            {/* 4. Player & Quiz Management */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[400px]">
                 <div className="p-4 border-b border-slate-200 flex justify-between items-center">
-                    <h2 className="font-bold text-lg flex items-center gap-2 text-slate-700">
-                        <Users size={20}/> 参加者管理 ({Array.isArray(state.players) ? state.players.length : 0}名)
-                    </h2>
-                    <div className="flex gap-2">
+                    <div className="flex gap-4">
                         <button 
-                        onClick={resetPlayerScores}
-                        className="px-3 py-1 text-xs border border-slate-300 rounded hover:bg-slate-100"
+                            onClick={() => setActiveTab('PLAYERS')}
+                            className={`text-sm font-bold flex items-center gap-2 pb-1 border-b-2 transition ${activeTab === 'PLAYERS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}
                         >
-                        スコアリセット
+                            <Users size={18}/> 参加者管理 ({Array.isArray(state.players) ? state.players.length : 0}名)
                         </button>
                         <button 
-                        onClick={() => {
-                            if(confirm('本当に全員のデータを削除して強制退場させますか？')) resetAllPlayers();
-                        }}
-                        className="px-3 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
+                            onClick={() => setActiveTab('QUIZ')}
+                            className={`text-sm font-bold flex items-center gap-2 pb-1 border-b-2 transition ${activeTab === 'QUIZ' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}
                         >
-                        全員キック
+                            <Terminal size={18}/> 問題リスト (プレビュー)
                         </button>
                     </div>
+
+                    {activeTab === 'PLAYERS' && (
+                        <div className="flex gap-2">
+                            <button 
+                            onClick={resetPlayerScores}
+                            className="px-3 py-1 text-xs border border-slate-300 rounded hover:bg-slate-100"
+                            >
+                            スコアリセット
+                            </button>
+                            <button 
+                            onClick={() => {
+                                if(confirm('本当に全員のデータを削除して強制退場させますか？')) resetAllPlayers();
+                            }}
+                            className="px-3 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
+                            >
+                            全員キック
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex-1 overflow-auto p-0">
-                    <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-50 sticky top-0 text-xs uppercase text-slate-500 z-10">
-                        <tr>
-                        <th className="p-3">名前</th>
-                        <th className="p-3">スコア</th>
-                        <th className="p-3">合計時間</th>
-                        <th className="p-3">現在の回答</th>
-                        <th className="p-3 text-right">アクション</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-sm">
-                        {sortedPlayers.length === 0 ? (
-                        <tr><td colSpan={5} className="p-8 text-center text-slate-400">参加者はまだいません</td></tr>
-                        ) : (
-                        sortedPlayers.map((player, index) => {
-                            const hasAns = player.lastAnswerIndex !== null && player.lastAnswerIndex !== undefined;
-                            // Check correctness if needed (only during result)
-                            const isCorrect = state.gameState === GameState.PLAYING_RESULT && player.lastAnswerIndex === state.questions[state.currentQuestionIndex]?.correctIndex;
-                            const totalSec = ((player.totalResponseTime || 0) / 1000).toFixed(1);
-
-                            return (
-                            <tr key={player.id} className="hover:bg-slate-50 group">
-                                <td className="p-3 font-bold text-slate-800">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-5 text-slate-400 text-xs">{index + 1}</span>
-                                    <div className={`w-2 h-2 rounded-full ${player.isOnline !== false ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                                    {player.name || 'No Name'}
-                                </div>
-                                </td>
-                                <td className="p-3 font-mono font-bold text-indigo-600">{player.score || 0}</td>
-                                <td className="p-3 font-mono text-xs text-slate-500 flex items-center gap-1">
-                                    <Clock size={12}/> {totalSec}s
-                                </td>
-                                <td className="p-3">
-                                {hasAns ? (
-                                    state.gameState === GameState.PLAYING_RESULT ? (
-                                        <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                            {isCorrect ? '正解' : '不正解'}
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-bold">
-                                            回答済み
-                                        </span>
-                                    )
+                    {activeTab === 'PLAYERS' ? (
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-slate-50 sticky top-0 text-xs uppercase text-slate-500 z-10">
+                                <tr>
+                                <th className="p-3">名前</th>
+                                <th className="p-3">スコア</th>
+                                <th className="p-3">合計時間</th>
+                                <th className="p-3">現在の回答</th>
+                                <th className="p-3 text-right">アクション</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-sm">
+                                {sortedPlayers.length === 0 ? (
+                                <tr><td colSpan={5} className="p-8 text-center text-slate-400">参加者はまだいません</td></tr>
                                 ) : (
-                                    <span className="text-slate-400 text-xs">-</span>
+                                sortedPlayers.map((player, index) => {
+                                    const hasAns = player.lastAnswerIndex !== null && player.lastAnswerIndex !== undefined;
+                                    // Check correctness if needed (only during result)
+                                    const isCorrect = state.gameState === GameState.PLAYING_RESULT && player.lastAnswerIndex === state.questions[state.currentQuestionIndex]?.correctIndex;
+                                    const totalSec = ((player.totalResponseTime || 0) / 1000).toFixed(1);
+
+                                    return (
+                                    <tr key={player.id} className="hover:bg-slate-50 group">
+                                        <td className="p-3 font-bold text-slate-800">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-5 text-slate-400 text-xs">{index + 1}</span>
+                                            <div className={`w-2 h-2 rounded-full ${player.isOnline !== false ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                                            {player.name || 'No Name'}
+                                        </div>
+                                        </td>
+                                        <td className="p-3 font-mono font-bold text-indigo-600">{player.score || 0}</td>
+                                        <td className="p-3 font-mono text-xs text-slate-500 flex items-center gap-1">
+                                            <Clock size={12}/> {totalSec}s
+                                        </td>
+                                        <td className="p-3">
+                                        {hasAns ? (
+                                            state.gameState === GameState.PLAYING_RESULT ? (
+                                                <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {isCorrect ? '正解' : '不正解'}
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-bold">
+                                                    回答済み
+                                                </span>
+                                            )
+                                        ) : (
+                                            <span className="text-slate-400 text-xs">-</span>
+                                        )}
+                                        </td>
+                                        <td className="p-3 text-right">
+                                        <button 
+                                            onClick={() => {
+                                            if(confirm(`${player.name}を退場させますか？`)) kickPlayer(player.id);
+                                            }}
+                                            className="p-1 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"
+                                            title="キック"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                        </td>
+                                    </tr>
+                                    );
+                                })
                                 )}
-                                </td>
-                                <td className="p-3 text-right">
-                                <button 
-                                    onClick={() => {
-                                    if(confirm(`${player.name}を退場させますか？`)) kickPlayer(player.id);
-                                    }}
-                                    className="p-1 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"
-                                    title="キック"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                                </td>
-                            </tr>
-                            );
-                        })
-                        )}
-                    </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    ) : (
+                        // QUIZ PREVIEW TAB
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-slate-50 sticky top-0 text-xs uppercase text-slate-500 z-10">
+                                <tr>
+                                <th className="p-3 w-10">#</th>
+                                <th className="p-3">問題文</th>
+                                <th className="p-3">正解</th>
+                                <th className="p-3">画像</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-sm">
+                                {state.questions.length === 0 ? (
+                                <tr><td colSpan={4} className="p-8 text-center text-slate-400">問題データがありません</td></tr>
+                                ) : (
+                                state.questions.map((q, index) => {
+                                    const hasQImage = q.questionImage;
+                                    const hasOptImage = q.optionImages && q.optionImages.some(i => i);
+                                    return (
+                                    <tr key={index} className="hover:bg-slate-50">
+                                        <td className="p-3 text-slate-400">{index + 1}</td>
+                                        <td className="p-3">
+                                            <div className="font-bold text-slate-700 line-clamp-2">{q.text}</div>
+                                            <div className="text-xs text-slate-400 mt-1">
+                                                {q.options.join(', ')}
+                                            </div>
+                                        </td>
+                                        <td className="p-3 font-mono text-green-600">{q.options[q.correctIndex]}</td>
+                                        <td className="p-3">
+                                            <div className="flex flex-col gap-1">
+                                                {hasQImage ? <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1 rounded inline-block w-fit">問画像あり</span> : <span className="text-[10px] text-slate-300">-</span>}
+                                                {hasOptImage ? <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded inline-block w-fit">選画像あり</span> : <span className="text-[10px] text-slate-300">-</span>}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    );
+                                })
+                                )}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
-                <div className="p-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 flex justify-between">
-                    <span>回答率: {Math.round((answeredCount / (Array.isArray(state.players) && state.players.length > 0 ? state.players.length : 1)) * 100)}%</span>
-                </div>
+                {activeTab === 'PLAYERS' && (
+                    <div className="p-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 flex justify-between">
+                        <span>回答率: {Math.round((answeredCount / (Array.isArray(state.players) && state.players.length > 0 ? state.players.length : 1)) * 100)}%</span>
+                    </div>
+                )}
             </div>
         </div>
 
