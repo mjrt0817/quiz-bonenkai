@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal, Monitor } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -233,7 +233,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         rankingRevealStage: 0,
         isRankingResultVisible: false,
         hideBelowTop3: false,
-        isLobbyDetailsVisible: false,
+        // Keep current visibility setting
         quizTitle: titleInput
       }));
       addLog(`成功！ ${questions.length}問をロードしました`);
@@ -419,6 +419,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
              </div>
           </div>
 
+          {/* NEW: Display Control (Visible in SETUP/LOBBY) */}
+          {(state.gameState === GameState.SETUP || state.gameState === GameState.LOBBY) && (
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+               <h2 className="font-bold text-lg mb-3 text-slate-700 flex items-center gap-2"><Monitor size={20}/> 画面表示</h2>
+               <button onClick={toggleLobbyDetails} className={`w-full py-3 rounded-lg font-bold text-sm border flex items-center justify-center gap-2 transition ${state.isLobbyDetailsVisible ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'}`}>
+                   {state.isLobbyDetailsVisible ? <ImageIcon size={18}/> : <QrCode size={18}/>}
+                   {state.isLobbyDetailsVisible ? 'タイトル画像モードへ' : 'QR・参加者モードへ'}
+               </button>
+               <p className="text-[10px] text-slate-400 mt-2 text-center">
+                   プロジェクター画面の表示を切り替えます
+               </p>
+            </div>
+          )}
+
           {/* 1. Setup Panel */}
           <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
             <h2 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-700"><RefreshCw size={20}/> クイズ読み込み</h2>
@@ -515,10 +529,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 {state.gameState === GameState.LOBBY && (
                   <div className="space-y-2">
-                     <button onClick={toggleLobbyDetails} className={`w-full py-3 rounded-lg font-bold text-sm border flex items-center justify-center gap-2 transition ${state.isLobbyDetailsVisible ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'}`}>
-                         {state.isLobbyDetailsVisible ? <ImageIcon size={18}/> : <QrCode size={18}/>}
-                         {state.isLobbyDetailsVisible ? 'タイトル画面に戻す' : 'QRコード・参加者を表示'}
-                     </button>
                      <button onClick={startGame} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700">
                         クイズ開始！
                      </button>
