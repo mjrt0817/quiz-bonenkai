@@ -193,7 +193,18 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
             </div>
 
             <div className="flex-1 flex flex-col justify-center max-w-6xl mx-auto w-full">
-               <div className="bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700 mb-8 text-center min-h-[150px] flex items-center justify-center">
+               <div className="bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700 mb-8 text-center min-h-[150px] flex flex-col items-center justify-center">
+                 {currentQuestion.questionImage && (
+                    <div className="mb-6 h-[200px] w-full flex justify-center">
+                       <img 
+                          src={currentQuestion.questionImage}
+                          alt="Question"
+                          className="h-full object-contain rounded-lg shadow-md"
+                          referrerPolicy="no-referrer"
+                          onError={handleImageError}
+                       />
+                    </div>
+                 )}
                  <h2 className="text-4xl md:text-5xl font-bold leading-tight">
                    {currentQuestion.text}
                  </h2>
