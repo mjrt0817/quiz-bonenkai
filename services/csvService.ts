@@ -78,9 +78,12 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
     const trimmed = url.trim();
     if (!trimmed) return "";
 
-    // Regex to detect Google Drive File View links
-    // e.g., https://drive.google.com/file/d/123456789/view?usp=sharing
-    const driveRegex = /drive\.google\.com\/(?:file\/d\/|open\?id=)([-a-zA-Z0-9_]+)/;
+    // Refined regex to match various Google Drive URL formats and capture the ID
+    // Matches:
+    // - drive.google.com/file/d/ID/...
+    // - drive.google.com/open?id=ID
+    // - drive.google.com/uc?id=ID
+    const driveRegex = /(?:drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)|docs\.google\.com\/file\/d\/)([-a-zA-Z0-9_]+)/;
     const match = trimmed.match(driveRegex);
     
     if (match && match[1]) {
@@ -130,17 +133,19 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
       let correctIndex = 0;
       let explanation = "";
       let optionImages: string[] = [];
+      let questionImage: string | undefined = undefined;
 
       // Detection: Image Format vs Standard Format
-      // Image Format usually has 11 columns: Q, O1-O4, I1-I4, Correct, Exp
-      // Standard Format has 7 columns: Q, O1-O4, Correct, Exp
+      // Image Format usually has 12 columns: 
+      // A:Question, B-E:Options, F-I:OptionImages, J:Correct, K:Explanation, L:QuestionImage
       
       // Check column J (index 9) for correct answer index
       const colJ = cols[9] ? parseInt(cols[9], 10) : NaN;
       // Check column F (index 5) for correct answer index (Standard format)
       const colF = cols[5] ? parseInt(cols[5], 10) : NaN;
 
-      const isImageFormat = cols.length >= 7 && !isNaN(colJ);
+      // We assume it's the image format if we have enough columns and col J looks like an index or F is NOT an index
+      const isImageFormat = cols.length >= 7 && (!isNaN(colJ) || cols.length >= 10);
 
       if (isImageFormat) {
          // NEW FORMAT with Images
@@ -150,12 +155,21 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
          
          correctIndex = isNaN(colJ) ? 0 : colJ - 1;
          explanation = cols[10] || "解説はありません";
+         
+         // Column L (index 11) is Question Image
+         if (cols[11]) {
+             questionImage = convertToDirectLink(cols[11]);
+         }
       } else {
          // OLD FORMAT
          // F is Correct Index
          correctIndex = isNaN(colF) ? 0 : colF - 1;
          explanation = cols[6] || "解説はありません";
       }
+
+      // Check if Question (Column A) is actually a URL (Legacy support or simple format)
+      // If A is a URL and L is empty, treat A as image and leave text blank? 
+      // For now, we only use L for explicit question images as requested.
 
       questions.push({
         id: `csv-${Date.now()}-${i}`,
@@ -165,7 +179,8 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
         // Also ensure individual array items are empty strings rather than undefined/null if they are blanks
         optionImages: optionImages.some(img => img !== "") ? optionImages : undefined,
         correctIndex: Math.max(0, Math.min(3, correctIndex)), // Bound to 0-3
-        explanation: explanation
+        explanation: explanation,
+        questionImage: questionImage && questionImage !== "" ? questionImage : undefined
       });
     }
 
