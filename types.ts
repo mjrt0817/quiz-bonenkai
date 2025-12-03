@@ -11,6 +11,7 @@ export interface QuizQuestion {
   text: string;
   options: string[];
   optionImages?: string[]; // Array of image URLs for options (optional)
+  questionImage?: string; // Image URL for the question itself (optional)
   correctIndex: number;
   explanation: string;
 }
