@@ -156,16 +156,16 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
     }
 
     return (
-      <div className="h-full bg-slate-900 flex flex-col p-4 pb-8">
+      <div className="h-full bg-slate-900 flex flex-col p-2 pb-4">
         {isFinalQuestion && (
-          <div className="w-full bg-red-600 text-white text-center font-bold py-3 rounded-xl mb-4 animate-pulse shadow-lg border-2 border-red-400 flex items-center justify-center gap-2">
-            <AlertTriangle size={20}/>
+          <div className="w-full bg-red-600 text-white text-center font-bold py-2 rounded-lg mb-2 animate-pulse shadow-lg border-2 border-red-400 flex items-center justify-center gap-2 text-sm shrink-0">
+            <AlertTriangle size={16}/>
             ⚠️ 最終問題 ⚠️
-            <AlertTriangle size={20}/>
+            <AlertTriangle size={16}/>
           </div>
         )}
 
-        <div className="w-full h-2 bg-slate-800 rounded-full mb-6 overflow-hidden">
+        <div className="w-full h-2 bg-slate-800 rounded-full mb-2 overflow-hidden shrink-0">
            <div 
              className={`h-full transition-all duration-100 ease-linear ${timeLeft < 5 ? 'bg-red-500' : 'bg-indigo-500'}`}
              style={{ width: `${(timeLeft / state.timeLimit) * 100}%` }}
@@ -173,7 +173,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
         </div>
 
         {currentQuestion?.questionImage && (
-             <div className="mb-4 h-[180px] w-full flex justify-center bg-slate-800 rounded-xl overflow-hidden shadow-md">
+             <div className="mb-2 h-[25vh] w-full flex justify-center bg-slate-800 rounded-xl overflow-hidden shadow-md shrink-0">
                  <img 
                     src={currentQuestion.questionImage}
                     alt="Question"
@@ -184,34 +184,38 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
              </div>
         )}
 
-        <div className="flex-1 grid grid-cols-2 gap-4 content-center">
+        <div className="flex-1 grid grid-cols-2 gap-2 min-h-0">
            {currentQuestion?.options.map((opt, idx) => {
              const imgUrl = currentQuestion.optionImages?.[idx];
              return (
               <button
                 key={idx}
                 onClick={() => onAnswer(idx)}
-                className={`${COLORS[idx]} w-full min-h-[250px] rounded-2xl shadow-lg flex flex-col items-center justify-center p-2 gap-2 active:scale-95 transition-transform overflow-hidden relative`}
+                className={`${COLORS[idx]} w-full h-full rounded-xl shadow-lg flex flex-col items-center justify-center active:scale-95 transition-transform overflow-hidden relative border-2 border-white/10`}
               >
-                <div className="absolute left-2 top-2 w-8 h-8 bg-black/20 rounded-full flex items-center justify-center font-bold text-white text-sm z-10">
+                <div className="absolute left-2 top-2 w-8 h-8 bg-black/40 rounded-full flex items-center justify-center font-bold text-white text-sm z-20 border border-white/30 backdrop-blur-sm">
                   {BTN_LABELS[idx]}
                 </div>
                 
                 {imgUrl ? (
                     <>
-                        <div className="flex-1 w-full bg-white rounded-lg overflow-hidden relative">
-                             <img 
-                                src={imgUrl} 
-                                alt="" 
-                                className="absolute inset-0 w-full h-full object-contain" 
-                                referrerPolicy="no-referrer"
-                                onError={handleImageError}
-                             />
-                        </div>
-                        <span className="text-white font-bold text-sm text-center line-clamp-2 w-full">{opt}</span>
+                        <img 
+                           src={imgUrl} 
+                           alt="" 
+                           className="absolute inset-0 w-full h-full object-contain bg-white/10" 
+                           referrerPolicy="no-referrer"
+                           onError={handleImageError}
+                        />
+                        {opt && (
+                           <div className="absolute bottom-0 w-full bg-black/70 py-1 px-2 text-center text-white font-bold text-sm backdrop-blur-sm z-10 line-clamp-2">
+                             {opt}
+                           </div>
+                        )}
                     </>
                 ) : (
-                    <span className="text-white font-bold text-lg text-center leading-tight line-clamp-3 break-words w-full px-2">{opt}</span>
+                    <span className="text-white font-bold text-xl text-center leading-tight line-clamp-5 break-words w-full px-2 drop-shadow-md">
+                        {opt}
+                    </span>
                 )}
               </button>
              );
