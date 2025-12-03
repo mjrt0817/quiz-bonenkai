@@ -72,7 +72,7 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
     }
   }
 
-  // --- Helper: Convert Google Drive Links to Direct Links (Thumbnail API) ---
+  // --- Helper: Convert Google Drive Links to Direct Links ---
   const convertToDirectLink = (url: string | undefined): string => {
     if (!url) return "";
     const trimmed = url.trim();
@@ -80,17 +80,18 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
 
     // 1. Try to extract ID from various Google Drive URL formats
     // Matches ID that follows /d/ or id= or file/d/
-    // Example: https://drive.google.com/file/d/1mkd2ilac5dqzC_14Jema_crWbKq2uzWT/view?usp=drive_link
+    // Handles query parameters like ?usp=drive_link
     const driveRegex = /(?:\/d\/|id=|file\/d\/)([a-zA-Z0-9_-]{15,})/;
     const match = trimmed.match(driveRegex);
     
     if (match && match[1]) {
-      // Use the thumbnail API instead of uc?export=view
-      // The thumbnail API (sz=w1920) is much more robust for embedding images and avoids many CORS/403 issues.
-      return `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1920`;
+      const fileId = match[1];
+      // Use lh3.googleusercontent.com/d/{ID} format
+      // This accesses the raw image data directly and is often friendlier to <img> tags than drive.google.com/uc
+      return `https://lh3.googleusercontent.com/d/${fileId}`;
     }
     
-    // If it's a direct lh3 link or other valid image URL, return as is
+    // If it's already a direct link or other valid image URL, return as is
     return trimmed;
   };
 
