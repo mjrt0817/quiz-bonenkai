@@ -186,7 +186,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         audio.volume = slot.volume;
         audio.loop = slot.isLoop;
 
-        // Setup handlers
+        // Setup handlers - Using a stable reference to index
+        // Cleanup old handlers first isn't easy with onended property, but simply overwriting works.
         audio.onended = () => {
             if (!audio?.loop) {
                 setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
