@@ -58,12 +58,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       soundSlots.forEach(slot => {
         if (slot.url) URL.revokeObjectURL(slot.url);
       });
-      audioRefs.current.forEach(audio => {
-        if (audio) {
-          audio.pause();
-          audio.src = '';
-        }
-      });
+      if (audioRefs.current) {
+        audioRefs.current.forEach(audio => {
+          if (audio) {
+            audio.pause();
+            audio.src = '';
+            audio.onended = null;
+            audio.onerror = null;
+          }
+        });
+      }
     };
   }, []);
 
@@ -72,7 +76,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [state.quizTitle]);
 
   // Optimize player sorting using useMemo to prevent re-calculations on every render
-  // SORT: Score (Desc) -> TotalResponseTime (Asc) -> Name (Asc)
   const sortedPlayers = useMemo(() => {
     try {
         // Safety check: ensure players is an array
@@ -103,7 +106,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [state.players]);
 
   // SAFELY calculate answered count. 
-  // CRITICAL FIX: Ensure state.players is an array before filtering
   const answeredCount = useMemo(() => {
     try {
         const list = Array.isArray(state.players) ? state.players : [];
@@ -142,10 +144,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       // 1. Stop and cleanup old audio if exists
-      const oldAudio = audioRefs.current[index];
-      if (oldAudio) {
-        oldAudio.pause();
-        oldAudio.src = '';
+      if (audioRefs.current && audioRefs.current[index]) {
+        const oldAudio = audioRefs.current[index];
+        if (oldAudio) {
+            oldAudio.pause();
+            oldAudio.src = '';
+            oldAudio.onended = null;
+            oldAudio.onerror = null;
+        }
         audioRefs.current[index] = null;
       }
 
@@ -169,6 +175,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
         const slot = soundSlots[index];
         if (!slot.url) return;
+        
+        if (!audioRefs.current) return;
 
         let audio = audioRefs.current[index];
 
@@ -182,12 +190,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         audio.volume = slot.volume;
         audio.loop = slot.isLoop;
 
-        // Setup handlers - Using a stable reference to index
-        // Cleanup old handlers first isn't easy with onended property, but simply overwriting works.
+        // Cleanup handlers
+        audio.onended = null;
+        audio.onerror = null;
+
         audio.onended = () => {
-            if (!audio?.loop) {
-                setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-            }
+             // Only update state if not looping
+             if (audioRefs.current?.[index]?.loop) return;
+             setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
         };
 
         audio.onerror = (e) => {
@@ -197,7 +207,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         };
 
         if (slot.isPlaying) {
-            // Restart if already playing (Pon-dashi)
+            // Restart (Pon-dashi)
             audio.currentTime = 0;
             audio.play().catch(e => {
                  console.error("Replay error", e);
@@ -205,10 +215,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             });
         } else {
             // Start
-            audio.play().catch(e => {
+            audio.play().then(() => {
+                // Play started
+            }).catch(e => {
                 console.error("Play error", e);
                 addLog(`Play Error: ${e.message}`);
-                // Revert state if failed
                 setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
             });
             setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
