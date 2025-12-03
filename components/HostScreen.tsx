@@ -45,30 +45,61 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   });
 
   // Determines if we are in the "Title Only" mode of the Lobby
-  // Logic: In SETUP or LOBBY, if isLobbyDetailsVisible is FALSE, show Title/Image only.
   const isTitleOnlyMode = (state.gameState === GameState.LOBBY || state.gameState === GameState.SETUP) && !state.isLobbyDetailsVisible;
 
   // Current Question Data
   const currentQuestion = state.questions[state.currentQuestionIndex];
-  const hasImages = currentQuestion?.optionImages && currentQuestion.optionImages.some(img => img && img.trim() !== "");
-
-  // Error handler for images
+  
+  // Image Error Fallback Handler
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    e.currentTarget.style.display = 'none';
-    // Optionally show fallback text or icon if needed
-    const parent = e.currentTarget.parentElement;
-    if (parent) {
-        const fallback = document.createElement('div');
-        fallback.className = "flex flex-col items-center justify-center h-full text-slate-400 p-2 text-center";
-        fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><span class="text-xs mt-1">Image Error</span>';
-        parent.appendChild(fallback);
+    const img = e.currentTarget;
+    // Prevent infinite loop
+    if (img.dataset.hasRetried === 'true') {
+        img.style.display = 'none';
+        // Show fallback UI
+        const parent = img.parentElement;
+        if (parent && !parent.querySelector('.fallback-icon')) {
+            const fallback = document.createElement('div');
+            fallback.className = "fallback-icon flex flex-col items-center justify-center h-full text-slate-400 p-2 text-center";
+            fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><span class="text-xs mt-1">Image Error</span>';
+            parent.appendChild(fallback);
+        }
+        return;
+    }
+
+    // Try fallback URL format
+    img.dataset.hasRetried = 'true';
+    const currentSrc = img.src;
+    
+    // If current is lh3, try uc?export=view
+    if (currentSrc.includes('lh3.googleusercontent.com/d/')) {
+        const id = currentSrc.split('/').pop();
+        if (id) {
+            img.src = `https://drive.google.com/uc?export=view&id=${id}`;
+        }
+    } 
+    // If current is uc?export=view, try lh3
+    else if (currentSrc.includes('drive.google.com/uc')) {
+        const url = new URL(currentSrc);
+        const id = url.searchParams.get('id');
+        if (id) {
+            img.src = `https://lh3.googleusercontent.com/d/${id}`;
+        }
+    }
+    // If thumbnail, try uc
+    else if (currentSrc.includes('drive.google.com/thumbnail')) {
+        const url = new URL(currentSrc);
+        const id = url.searchParams.get('id');
+        if (id) {
+             img.src = `https://drive.google.com/uc?export=view&id=${id}`;
+        }
     }
   };
 
   return (
     <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
       
-      {/* HEADER - Hidden in Title Only Mode for Full Immersion */}
+      {/* HEADER */}
       {!isTitleOnlyMode && (
         <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10">
             <div className="flex items-center gap-4">
@@ -81,14 +112,12 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
             </div>
             </div>
             
-            {/* FINAL QUESTION BANNER */}
             {state.gameState === GameState.PLAYING_QUESTION && isFinalQuestion && (
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-8 py-2 rounded-full font-black text-xl animate-pulse shadow-[0_0_20px_rgba(220,38,38,0.6)] flex items-center gap-2 border-2 border-white">
                     <AlertTriangle /> ⚠️ 最終問題 ⚠️ <AlertTriangle />
                 </div>
             )}
 
-            {/* QR Code (Mini) */}
             {state.gameState !== GameState.SETUP && state.gameState !== GameState.LOBBY && (
                 <div className="bg-white p-1 rounded">
                 <img 
@@ -108,10 +137,9 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
         {(state.gameState === GameState.SETUP || state.gameState === GameState.LOBBY) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             
-            {/* CASE A: Title Only Mode (Full Screen) */}
+            {/* CASE A: Title Only Mode */}
             {isTitleOnlyMode ? (
                 <div className="w-full h-full flex items-center justify-center bg-black relative">
-                     {/* Background Pattern */}
                      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
                      
                      {state.titleImage ? (
@@ -130,10 +158,9 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                      )}
                 </div>
             ) : (
-                /* CASE B: Details Mode (QR & Players) */
+                /* CASE B: Details Mode */
                 <div className="w-full h-full flex flex-col items-center justify-start pt-6 p-6">
                     
-                    {/* Small Title Image or Text at top */}
                     {state.titleImage ? (
                         <div className="mb-4 max-h-[100px] flex justify-center">
                             <img src={state.titleImage} alt="Tournament Title" className="h-full object-contain drop-shadow-lg" />
@@ -171,9 +198,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                                 <span className="font-bold text-sm truncate">{player.name}</span>
                                 </div>
                             ))}
-                            {state.players.length === 0 && (
-                                <p className="col-span-full text-center text-slate-500 py-10">待機中...</p>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -184,7 +208,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
         {/* 2. QUESTION SCREEN */}
         {state.gameState === GameState.PLAYING_QUESTION && currentQuestion && (
           <div className="absolute inset-0 flex flex-col p-8">
-            {/* Timer Bar */}
             <div className="w-full h-4 bg-slate-800 rounded-full mb-8 overflow-hidden border border-slate-700">
               <div 
                 className={`h-full transition-all duration-100 ease-linear ${timeLeft < 5 ? 'bg-red-500' : 'bg-indigo-500'}`}
@@ -193,9 +216,10 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
             </div>
 
             <div className="flex-1 flex flex-col justify-center max-w-6xl mx-auto w-full">
-               <div className="bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700 mb-8 text-center min-h-[150px] flex flex-col items-center justify-center">
+               <div className="bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700 mb-8 text-center min-h-[150px] flex flex-col items-center justify-center relative">
+                 {/* Question Image */}
                  {currentQuestion.questionImage && (
-                    <div className="mb-6 h-[200px] w-full flex justify-center">
+                    <div className="mb-6 h-[400px] w-full flex justify-center">
                        <img 
                           src={currentQuestion.questionImage}
                           alt="Question"
@@ -205,25 +229,22 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                        />
                     </div>
                  )}
-                 <h2 className="text-4xl md:text-5xl font-bold leading-tight">
+                 <h2 className="text-4xl md:text-5xl font-bold leading-tight relative z-10">
                    {currentQuestion.text}
                  </h2>
                </div>
 
-               {/* OPTION GRID - Layout adapts if images are present */}
+               {/* OPTION GRID */}
                <div className="grid grid-cols-2 gap-6 h-[500px]">
                  {currentQuestion.options.map((option, idx) => {
                    const imgUrl = currentQuestion.optionImages?.[idx];
                    return (
                     <div key={idx} className={`${COLORS[idx]} rounded-2xl flex relative overflow-hidden group shadow-lg`}>
-                        {/* Option Label (A, B, C, D) */}
                         <div className="absolute left-0 top-0 z-20 bg-black/40 w-12 h-12 flex items-center justify-center rounded-br-xl text-2xl font-black text-white">
                             {BTN_LABELS[idx]}
                         </div>
 
-                        {/* Content */}
                         {imgUrl ? (
-                            // Image Mode
                             <div className="flex-1 flex flex-col h-full">
                                 <div className="flex-1 relative bg-white">
                                     <img 
@@ -239,9 +260,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                                 </div>
                             </div>
                         ) : (
-                            // Text Only Mode
                             <div className="flex-1 flex items-center justify-center p-6">
-                                <div className="absolute left-0 top-0 bottom-0 w-24 bg-black/10"></div> {/* Decorative sidebar */}
                                 <span className="ml-10 text-4xl font-bold text-white shadow-black drop-shadow-md leading-tight">
                                     {option}
                                 </span>
@@ -262,7 +281,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
               <div className="bg-green-600 text-white p-12 rounded-3xl shadow-[0_0_50px_rgba(22,163,74,0.5)] flex flex-col items-center max-w-4xl w-full animate-in zoom-in duration-500 border-4 border-green-400">
                  <CheckCircle size={80} className="mb-6" />
                  
-                 {/* Show Image if available for correct answer */}
                  {currentQuestion.optionImages?.[currentQuestion.correctIndex] && (
                      <div className="mb-6 bg-white p-2 rounded-xl">
                         <img 
@@ -292,7 +310,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
            </div>
         )}
 
-        {/* 4. FINAL RANKING SCREEN (Staged Reveal with Manual Control) */}
+        {/* 4. FINAL RANKING SCREEN */}
         {state.gameState === GameState.FINAL_RESULT && (
            <div className="absolute inset-0 flex flex-col p-6 bg-slate-900 items-center justify-center">
               <div className="text-center mb-10">
@@ -301,9 +319,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                  </h2>
               </div>
 
-              {/* PODIUM ONLY - CENTERED */}
               <div className="w-full max-w-5xl h-[600px] flex items-end justify-center gap-8 pb-10">
-                  
                   {/* 2nd Place */}
                   <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 2 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
                      {state.rankingRevealStage === 2 && !state.isRankingResultVisible ? (
@@ -362,7 +378,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
       </main>
 
-      {/* FOOTER CONTROLS - Hide on Title Only mode */}
       {!isTitleOnlyMode && (
         <footer className="bg-slate-800 p-2 flex justify-between items-center text-xs text-slate-500 z-10">
             <div className="flex gap-4">
