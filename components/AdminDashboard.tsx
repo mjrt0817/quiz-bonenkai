@@ -49,12 +49,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }))
   );
   
-  // Refs to hold Audio objects - Initialize with array of 6 nulls
-  const audioRefs = useRef<(HTMLAudioElement | null)[]>([]);
-  // Ensure the array has 6 slots
-  if (audioRefs.current.length !== 6) {
-      audioRefs.current = new Array(6).fill(null);
-  }
+  // Refs to hold Audio objects - Initialize with array of 6 nulls safely
+  const audioRefs = useRef<(HTMLAudioElement | null)[]>(new Array(6).fill(null));
 
   // Cleanup audio on unmount
   useEffect(() => {
