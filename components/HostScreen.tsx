@@ -17,7 +17,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     }
   }, []);
 
-  // Visual Timer Logic
   useEffect(() => {
     let timerId: any;
     if (state.gameState === GameState.PLAYING_QUESTION && state.questionStartTime) {
@@ -35,73 +34,58 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     };
   }, [state.gameState, state.questionStartTime, state.timeLimit]);
 
-  // Helper for Final Question
   const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
-  // Sorted Players for Ranking
   const sortedPlayers = [...state.players].sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       return (a.totalResponseTime || 0) - (b.totalResponseTime || 0);
   });
 
-  // Determines if we are in the "Title Only" mode of the Lobby
   const isTitleOnlyMode = (state.gameState === GameState.LOBBY || state.gameState === GameState.SETUP) && !state.isLobbyDetailsVisible;
-
-  // Current Question Data
   const currentQuestion = state.questions[state.currentQuestionIndex];
   
-  // Image Error Fallback Handler
+  // Robust Image Error Handler
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const img = e.currentTarget;
-    // Prevent infinite loop
-    if (img.dataset.hasRetried === 'true') {
-        img.style.display = 'none';
-        // Show fallback UI
-        const parent = img.parentElement;
-        if (parent && !parent.querySelector('.fallback-icon')) {
-            const fallback = document.createElement('div');
-            fallback.className = "fallback-icon flex flex-col items-center justify-center h-full text-slate-400 p-2 text-center";
-            fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><span class="text-xs mt-1">Image Error</span>';
-            parent.appendChild(fallback);
-        }
-        return;
-    }
-
-    // Try fallback URL format
-    img.dataset.hasRetried = 'true';
     const currentSrc = img.src;
-    
-    // If current is lh3, try uc?export=view
+
+    // 1. If currently using lh3 format, try falling back to standard drive uc format
     if (currentSrc.includes('lh3.googleusercontent.com/d/')) {
+        // Only retry once
+        if (img.dataset.retried === 'true') {
+             img.style.display = 'none';
+             showFallback(img);
+             return;
+        }
+        img.dataset.retried = 'true';
+        
         const id = currentSrc.split('/').pop();
         if (id) {
             img.src = `https://drive.google.com/uc?export=view&id=${id}`;
         }
-    } 
-    // If current is uc?export=view, try lh3
-    else if (currentSrc.includes('drive.google.com/uc')) {
-        const url = new URL(currentSrc);
-        const id = url.searchParams.get('id');
-        if (id) {
-            img.src = `https://lh3.googleusercontent.com/d/${id}`;
-        }
+        return;
     }
-    // If thumbnail, try uc
-    else if (currentSrc.includes('drive.google.com/thumbnail')) {
-        const url = new URL(currentSrc);
-        const id = url.searchParams.get('id');
-        if (id) {
-             img.src = `https://drive.google.com/uc?export=view&id=${id}`;
-        }
-    }
+
+    // 2. If it was already standard drive format or other, show fallback
+    img.style.display = 'none';
+    showFallback(img);
+  };
+
+  const showFallback = (img: HTMLImageElement) => {
+     const parent = img.parentElement;
+     if (parent && !parent.querySelector('.fallback-icon')) {
+        const fallback = document.createElement('div');
+        fallback.className = "fallback-icon flex flex-col items-center justify-center h-full w-full bg-slate-800 text-slate-500 p-2 text-center rounded-lg";
+        fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><span class="text-[10px] mt-1 font-mono">Image Error</span>';
+        parent.appendChild(fallback);
+     }
   };
 
   return (
     <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
       
-      {/* HEADER */}
       {!isTitleOnlyMode && (
-        <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10">
+        <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10 shrink-0">
             <div className="flex items-center gap-4">
             <div className="bg-indigo-600 p-2 rounded-lg">
                 <Monitor size={24} />
@@ -130,14 +114,10 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
         </header>
       )}
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 relative flex flex-col">
+      <main className="flex-1 relative flex flex-col overflow-hidden">
         
-        {/* 1. LOBBY SCREEN */}
         {(state.gameState === GameState.SETUP || state.gameState === GameState.LOBBY) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            
-            {/* CASE A: Title Only Mode */}
             {isTitleOnlyMode ? (
                 <div className="w-full h-full flex items-center justify-center bg-black relative">
                      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-20"></div>
@@ -158,7 +138,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                      )}
                 </div>
             ) : (
-                /* CASE B: Details Mode */
                 <div className="w-full h-full flex flex-col items-center justify-start pt-6 p-6">
                     
                     {state.titleImage ? (
@@ -171,33 +150,49 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                         </h2>
                     )}
                     
-                    <div className="flex flex-col md:flex-row items-center gap-8 mb-6 bg-slate-800/50 p-6 rounded-3xl border border-slate-700">
-                    <div className="bg-white p-2 rounded-xl shadow-2xl">
-                        <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(playerUrl)}`}
-                        alt="Join QR"
-                        className="w-40 h-40 md:w-56 md:h-56"
-                        />
+                    <div className="flex flex-col md:flex-row items-center gap-8 mb-6 bg-slate-800/50 p-6 rounded-3xl border border-slate-700 shadow-xl backdrop-blur-sm">
+                        <div className="bg-white p-4 rounded-xl shadow-lg transform rotate-[-2deg] hover:rotate-0 transition duration-500">
+                           <img 
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(playerUrl)}`}
+                              alt="Join QR"
+                              className="w-64 h-64"
+                           />
+                           <div className="mt-2 text-center text-slate-900 font-mono font-bold text-sm bg-slate-100 py-1 rounded">
+                             {playerUrl.replace(/^https?:\/\//, '')}
+                           </div>
+                        </div>
+                        <div className="text-left space-y-4 max-w-md">
+                           <div className="space-y-2">
+                               <div className="flex items-center gap-3">
+                                   <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">1</div>
+                                   <p className="text-lg">スマホでQRコードを読み取る</p>
+                               </div>
+                               <div className="flex items-center gap-3">
+                                   <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">2</div>
+                                   <p className="text-lg">ニックネームを入力して参加</p>
+                               </div>
+                               <div className="flex items-center gap-3">
+                                   <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">3</div>
+                                   <p className="text-lg">ホストの開始を待つ</p>
+                               </div>
+                           </div>
+                        </div>
                     </div>
-                    <div className="text-center md:text-left">
-                        <p className="text-slate-400 mb-2">スマホでQRコードを読み込んで参加！</p>
-                        <p className="text-3xl font-mono font-bold text-white bg-slate-900 px-6 py-3 rounded-xl border border-slate-600">
-                        {playerUrl}
-                        </p>
-                    </div>
-                    </div>
-
-                    <div className="w-full max-w-6xl flex-1 bg-slate-800/30 rounded-2xl border border-slate-700 p-4 overflow-hidden flex flex-col">
-                        <h3 className="text-lg font-bold text-slate-400 mb-4 flex items-center gap-2">
-                            <Users size={20}/> エントリー済み ({state.players.length}名)
-                        </h3>
-                        <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3 content-start">
-                            {state.players.map(player => (
-                                <div key={player.id} className="bg-slate-700 p-2 rounded-lg flex items-center gap-2 animate-in zoom-in duration-300">
-                                <div className={`w-2 h-2 rounded-full ${player.isOnline !== false ? 'bg-green-400' : 'bg-gray-500'}`} />
-                                <span className="font-bold text-sm truncate">{player.name}</span>
-                                </div>
-                            ))}
+                    
+                    <div className="w-full max-w-6xl flex-1 flex flex-col min-h-0 bg-slate-800/30 rounded-xl border border-slate-700/50 overflow-hidden backdrop-blur-sm">
+                        <div className="p-3 bg-slate-800/80 text-center font-bold text-slate-300 border-b border-slate-700 flex justify-between items-center px-6">
+                            <span>エントリー済み参加者</span>
+                            <span className="bg-indigo-600 text-white px-3 py-0.5 rounded-full text-sm">{state.players.length}名</span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
+                                {sortedPlayers.map((player) => (
+                                    <div key={player.id} className="bg-slate-700/50 p-2 rounded-lg flex items-center gap-2 animate-in fade-in zoom-in duration-300">
+                                        <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
+                                        <span className="font-bold text-sm truncate">{player.name}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -205,187 +200,180 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
           </div>
         )}
 
-        {/* 2. QUESTION SCREEN */}
-        {state.gameState === GameState.PLAYING_QUESTION && currentQuestion && (
-          <div className="absolute inset-0 flex flex-col p-8">
-            <div className="w-full h-4 bg-slate-800 rounded-full mb-8 overflow-hidden border border-slate-700">
-              <div 
-                className={`h-full transition-all duration-100 ease-linear ${timeLeft < 5 ? 'bg-red-500' : 'bg-indigo-500'}`}
-                style={{ width: `${(timeLeft / state.timeLimit) * 100}%` }}
-              />
+        {state.gameState === GameState.PLAYING_QUESTION && (
+          <div className="flex-1 flex flex-col p-4 h-full">
+            <div className="w-full h-4 bg-slate-800 rounded-full mb-4 overflow-hidden shrink-0">
+               <div 
+                 className={`h-full transition-all duration-100 ease-linear ${timeLeft < 5 ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]' : 'bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]'}`}
+                 style={{ width: `${(timeLeft / state.timeLimit) * 100}%` }}
+               />
+            </div>
+            
+            <div className="mb-4 text-center shrink-0">
+               <h2 className={`font-bold leading-tight mb-2 drop-shadow-md ${currentQuestion?.questionImage ? 'text-2xl' : 'text-5xl md:text-6xl mt-8'}`}>
+                  <span className="text-indigo-400 mr-4">Q.{state.currentQuestionIndex + 1}</span>
+                  {currentQuestion?.text}
+               </h2>
+               
+               {currentQuestion?.questionImage && (
+                   <div className="mx-auto h-[25vh] w-auto max-w-full rounded-xl overflow-hidden border-2 border-slate-700 bg-black/50 shadow-lg relative inline-block">
+                        <img 
+                            src={currentQuestion.questionImage} 
+                            alt="Question" 
+                            className="h-full w-auto object-contain"
+                            referrerPolicy="no-referrer"
+                            onError={handleImageError}
+                        />
+                   </div>
+               )}
             </div>
 
-            <div className="flex-1 flex flex-col justify-center max-w-6xl mx-auto w-full">
-               <div className="bg-slate-800 p-8 rounded-3xl shadow-2xl border border-slate-700 mb-8 text-center min-h-[150px] flex flex-col items-center justify-center relative">
-                 {/* Question Image */}
-                 {currentQuestion.questionImage && (
-                    <div className="mb-6 h-[400px] w-full flex justify-center">
-                       <img 
-                          src={currentQuestion.questionImage}
-                          alt="Question"
-                          className="h-full object-contain rounded-lg shadow-md"
-                          referrerPolicy="no-referrer"
-                          onError={handleImageError}
-                       />
-                    </div>
-                 )}
-                 <h2 className="text-4xl md:text-5xl font-bold leading-tight relative z-10">
-                   {currentQuestion.text}
-                 </h2>
-               </div>
-
-               {/* OPTION GRID */}
-               <div className="grid grid-cols-2 gap-6 h-[500px]">
-                 {currentQuestion.options.map((option, idx) => {
-                   const imgUrl = currentQuestion.optionImages?.[idx];
-                   return (
-                    <div key={idx} className={`${COLORS[idx]} rounded-2xl flex relative overflow-hidden group shadow-lg`}>
-                        <div className="absolute left-0 top-0 z-20 bg-black/40 w-12 h-12 flex items-center justify-center rounded-br-xl text-2xl font-black text-white">
-                            {BTN_LABELS[idx]}
-                        </div>
-
-                        {imgUrl ? (
-                            <div className="flex-1 flex flex-col h-full">
-                                <div className="flex-1 relative bg-white">
-                                    <img 
-                                      src={imgUrl} 
-                                      alt={`Option ${idx}`} 
-                                      className="absolute inset-0 w-full h-full object-contain p-2" 
-                                      referrerPolicy="no-referrer"
-                                      onError={handleImageError}
-                                    />
-                                </div>
-                                <div className="p-4 text-center bg-black/10 min-h-[60px] flex items-center justify-center">
-                                    <span className="text-2xl font-bold text-white drop-shadow-md">{option}</span>
-                                </div>
+            <div className="flex-1 grid grid-cols-2 gap-4 w-full max-w-7xl mx-auto min-h-0">
+               {currentQuestion?.options.map((opt, idx) => {
+                 const imgUrl = currentQuestion.optionImages?.[idx];
+                 return (
+                  <div
+                    key={idx}
+                    className={`${COLORS[idx]} w-full h-full rounded-2xl shadow-xl flex flex-col items-center justify-center text-white relative overflow-hidden border-4 border-white/10`}
+                  >
+                     <div className="absolute left-4 top-4 w-12 h-12 bg-black/20 rounded-full flex items-center justify-center font-black text-2xl z-10 border-2 border-white/20">
+                       {BTN_LABELS[idx]}
+                     </div>
+                     
+                     {imgUrl ? (
+                         <>
+                            <div className="flex-1 w-full bg-white relative">
+                                <img 
+                                    src={imgUrl} 
+                                    alt={opt} 
+                                    className="absolute inset-0 w-full h-full object-contain" 
+                                    referrerPolicy="no-referrer"
+                                    onError={handleImageError}
+                                />
                             </div>
-                        ) : (
-                            <div className="flex-1 flex items-center justify-center p-6">
-                                <span className="ml-10 text-4xl font-bold text-white shadow-black drop-shadow-md leading-tight">
-                                    {option}
-                                </span>
+                            <div className="w-full bg-black/40 p-2 text-center font-bold text-xl md:text-2xl backdrop-blur-sm shrink-0">
+                                {opt}
                             </div>
-                        )}
-                    </div>
-                   );
-                 })}
-               </div>
+                         </>
+                     ) : (
+                         <span className="text-3xl md:text-5xl font-bold text-center px-4 leading-snug drop-shadow-md">{opt}</span>
+                     )}
+                  </div>
+                 );
+               })}
             </div>
           </div>
         )}
 
-        {/* 3. RESULT SCREEN */}
-        {state.gameState === GameState.PLAYING_RESULT && currentQuestion && (
-           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-slate-900">
-              <h2 className="text-3xl font-bold text-slate-400 mb-8 uppercase tracking-widest">Correct Answer</h2>
-              <div className="bg-green-600 text-white p-12 rounded-3xl shadow-[0_0_50px_rgba(22,163,74,0.5)] flex flex-col items-center max-w-4xl w-full animate-in zoom-in duration-500 border-4 border-green-400">
-                 <CheckCircle size={80} className="mb-6" />
-                 
-                 {currentQuestion.optionImages?.[currentQuestion.correctIndex] && (
-                     <div className="mb-6 bg-white p-2 rounded-xl">
-                        <img 
-                            src={currentQuestion.optionImages[currentQuestion.correctIndex]} 
-                            alt="Correct" 
-                            className="h-48 object-contain"
-                            referrerPolicy="no-referrer"
-                            onError={handleImageError}
-                        />
-                     </div>
-                 )}
-
-                 <div className="text-5xl font-black text-center mb-4">
-                    {currentQuestion.options[currentQuestion.correctIndex]}
-                 </div>
-                 {currentQuestion.explanation && (
-                     <div className="mt-8 bg-black/20 p-6 rounded-xl w-full text-left">
-                         <div className="flex items-center gap-2 mb-2 text-green-200 font-bold uppercase text-sm">
-                             <Sparkles size={16}/> 解説
-                         </div>
-                         <p className="text-xl leading-relaxed">
-                            {currentQuestion.explanation}
-                         </p>
-                     </div>
-                 )}
-              </div>
-           </div>
-        )}
-
-        {/* 4. FINAL RANKING SCREEN */}
-        {state.gameState === GameState.FINAL_RESULT && (
-           <div className="absolute inset-0 flex flex-col p-6 bg-slate-900 items-center justify-center">
-              <div className="text-center mb-10">
-                 <h2 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-amber-600 drop-shadow-sm inline-flex items-center gap-6">
-                    <Trophy size={64} className="text-yellow-500" /> FINAL RANKING
-                 </h2>
-              </div>
-
-              <div className="w-full max-w-5xl h-[600px] flex items-end justify-center gap-8 pb-10">
-                  {/* 2nd Place */}
-                  <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 2 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
-                     {state.rankingRevealStage === 2 && !state.isRankingResultVisible ? (
-                       <div className="mb-20 animate-pulse text-6xl font-black text-slate-500">???</div>
-                     ) : (
-                       <>
-                         <div className="mb-4 text-center">
-                             <Medal size={80} className="text-slate-300 mx-auto mb-2" />
-                             <div className="text-3xl font-bold text-slate-300">2nd</div>
-                             <div className="text-4xl font-black truncate max-w-[280px]">{sortedPlayers[1]?.name || '-'}</div>
-                             <div className="font-mono text-2xl text-indigo-400">{sortedPlayers[1]?.score || 0} pts</div>
-                         </div>
-                         <div className="w-full h-[300px] bg-gradient-to-t from-slate-700 to-slate-600 rounded-t-2xl shadow-2xl border-t-8 border-slate-400"></div>
-                       </>
-                     )}
-                  </div>
-
-                  {/* 1st Place */}
-                  <div className={`w-1/3 flex flex-col justify-end items-center z-10 transition-all duration-700 delay-200 transform ${state.rankingRevealStage >= 3 ? 'translate-y-0 opacity-100 scale-110' : 'translate-y-20 opacity-0'}`}>
-                     {state.rankingRevealStage === 3 && !state.isRankingResultVisible ? (
-                       <div className="mb-32 animate-bounce text-8xl font-black text-yellow-500">???</div>
-                     ) : (
-                       <>
-                         <div className="mb-4 text-center">
-                             <Trophy size={100} className="text-yellow-400 mx-auto mb-4 animate-bounce-short" />
-                             <div className="text-4xl font-bold text-yellow-400">1st</div>
-                             <div className="text-5xl font-black truncate max-w-[350px] text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{sortedPlayers[0]?.name || '-'}</div>
-                             <div className="font-mono text-4xl text-yellow-200">{sortedPlayers[0]?.score || 0} pts</div>
-                         </div>
-                         <div className="w-full h-[450px] bg-gradient-to-t from-yellow-600 to-yellow-500 rounded-t-2xl shadow-[0_0_80px_rgba(234,179,8,0.4)] border-t-8 border-yellow-300 relative overflow-hidden">
-                             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
-                         </div>
-                       </>
-                     )}
-                  </div>
-
-                  {/* 3rd Place */}
-                  <div className={`w-1/3 flex flex-col justify-end items-center transition-all duration-700 transform ${state.rankingRevealStage >= 1 ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'}`}>
-                     {state.rankingRevealStage === 1 && !state.isRankingResultVisible ? (
-                       <div className="mb-10 animate-pulse text-6xl font-black text-amber-700">???</div>
-                     ) : (
-                       <>
-                         <div className="mb-4 text-center">
-                             <Medal size={80} className="text-amber-700 mx-auto mb-2" />
-                             <div className="text-3xl font-bold text-amber-700">3rd</div>
-                             <div className="text-4xl font-black truncate max-w-[280px]">{sortedPlayers[2]?.name || '-'}</div>
-                             <div className="font-mono text-2xl text-indigo-400">{sortedPlayers[2]?.score || 0} pts</div>
-                         </div>
-                         <div className="w-full h-[200px] bg-gradient-to-t from-amber-800 to-amber-700 rounded-t-2xl shadow-2xl border-t-8 border-amber-600"></div>
-                       </>
-                     )}
-                  </div>
-              </div>
-           </div>
-        )}
-
-      </main>
-
-      {!isTitleOnlyMode && (
-        <footer className="bg-slate-800 p-2 flex justify-between items-center text-xs text-slate-500 z-10">
-            <div className="flex gap-4">
-            <span>Room: {state.roomCode}</span>
-            <button onClick={onBack} className="hover:text-white">Exit Viewer</button>
+        {(state.gameState === GameState.PLAYING_RESULT || state.gameState === GameState.FINAL_RESULT) && (
+          <div className="flex-1 flex flex-col items-center justify-center relative p-6">
+            <div className="absolute inset-0 overflow-hidden">
+                <div className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] bg-[radial-gradient(circle,rgba(99,102,241,0.15)_0%,transparent_60%)] animate-pulse-fast"></div>
             </div>
-        </footer>
-      )}
+
+            {state.gameState === GameState.PLAYING_RESULT && (
+                <div className="z-10 text-center animate-in zoom-in duration-300">
+                    <h2 className="text-3xl font-bold text-slate-400 mb-4 uppercase tracking-widest">Correct Answer</h2>
+                    <div className="text-6xl md:text-8xl font-black text-white mb-8 drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]">
+                        {currentQuestion?.options[currentQuestion.correctIndex]}
+                    </div>
+                    
+                    {currentQuestion?.optionImages?.[currentQuestion.correctIndex] && (
+                        <div className="mx-auto h-[25vh] rounded-xl overflow-hidden border-4 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)] mb-8 bg-white">
+                             <img 
+                                src={currentQuestion.optionImages[currentQuestion.correctIndex]} 
+                                alt="Correct Answer" 
+                                className="h-full w-full object-contain"
+                                referrerPolicy="no-referrer"
+                                onError={handleImageError}
+                             />
+                        </div>
+                    )}
+                    
+                    <div className="bg-slate-800/80 backdrop-blur-md p-8 rounded-3xl border border-slate-700 max-w-4xl mx-auto shadow-2xl">
+                        <h3 className="text-xl font-bold text-indigo-400 mb-2 flex items-center justify-center gap-2">
+                            <Sparkles size={20}/> 解説
+                        </h3>
+                        <p className="text-2xl text-slate-100 leading-relaxed">
+                            {currentQuestion?.explanation}
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {state.gameState === GameState.FINAL_RESULT && (
+                <div className="z-10 w-full max-w-6xl mx-auto">
+                    <div className="text-center mb-6">
+                        <h2 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-600 drop-shadow-sm mb-2">
+                           FINAL RANKING
+                        </h2>
+                        <p className="text-xl text-yellow-100/60 font-light tracking-[0.5em] uppercase">Tournament Results</p>
+                    </div>
+
+                    {/* TOP 3 PODIUM */}
+                    <div className="flex justify-center items-end gap-4 h-[50vh] mb-8 px-4 relative">
+                        {/* 2nd Place */}
+                        <div className={`w-1/3 max-w-[280px] flex flex-col justify-end transition-all duration-1000 ${state.isRankingResultVisible && state.rankingRevealStage >= 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}`}>
+                             <div className="text-center mb-2">
+                                <div className="text-3xl font-bold text-slate-300 drop-shadow-lg mb-1">{state.isRankingResultVisible ? sortedPlayers[1]?.name : '???'}</div>
+                                <div className="text-xl font-mono text-slate-400">{state.isRankingResultVisible ? `${sortedPlayers[1]?.score} pts` : ''}</div>
+                             </div>
+                             <div className="h-[60%] bg-gradient-to-t from-slate-400 to-slate-300 rounded-t-lg shadow-[0_0_30px_rgba(148,163,184,0.3)] border-t border-white/50 flex flex-col items-center justify-start pt-4 relative">
+                                <Medal size={60} className="text-slate-600 drop-shadow-md mb-2" />
+                                <div className="text-6xl font-black text-slate-600/50">2</div>
+                             </div>
+                        </div>
+
+                        {/* 1st Place */}
+                        <div className={`w-1/3 max-w-[320px] flex flex-col justify-end z-10 -mx-2 transition-all duration-1000 delay-300 ${state.isRankingResultVisible && state.rankingRevealStage >= 3 ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-20 scale-95'}`}>
+                             <div className="text-center mb-4">
+                                <div className="relative inline-block">
+                                    <Trophy size={64} className="text-yellow-400 absolute -top-16 left-1/2 -translate-x-1/2 animate-bounce-short drop-shadow-[0_0_15px_rgba(250,204,21,0.8)]" />
+                                    <div className="text-4xl md:text-5xl font-black text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] mb-1">{state.isRankingResultVisible ? sortedPlayers[0]?.name : '???'}</div>
+                                </div>
+                                <div className="text-3xl font-mono font-bold text-yellow-100">{state.isRankingResultVisible ? `${sortedPlayers[0]?.score} pts` : ''}</div>
+                             </div>
+                             <div className="h-[80%] bg-gradient-to-t from-yellow-500 to-yellow-300 rounded-t-xl shadow-[0_0_50px_rgba(234,179,8,0.5)] border-t border-white/50 flex flex-col items-center justify-start pt-8 relative overflow-hidden">
+                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
+                                <div className="text-8xl font-black text-yellow-700/50">1</div>
+                             </div>
+                        </div>
+
+                        {/* 3rd Place */}
+                        <div className={`w-1/3 max-w-[280px] flex flex-col justify-end transition-all duration-1000 ${state.isRankingResultVisible && state.rankingRevealStage >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}`}>
+                             <div className="text-center mb-2">
+                                <div className="text-3xl font-bold text-amber-600 drop-shadow-lg mb-1">{state.isRankingResultVisible ? sortedPlayers[2]?.name : '???'}</div>
+                                <div className="text-xl font-mono text-amber-700">{state.isRankingResultVisible ? `${sortedPlayers[2]?.score} pts` : ''}</div>
+                             </div>
+                             <div className="h-[45%] bg-gradient-to-t from-amber-700 to-amber-500 rounded-t-lg shadow-[0_0_30px_rgba(217,119,6,0.3)] border-t border-white/50 flex flex-col items-center justify-start pt-4 relative">
+                                <Medal size={60} className="text-amber-900 drop-shadow-md mb-2" />
+                                <div className="text-6xl font-black text-amber-900/40">3</div>
+                             </div>
+                        </div>
+                    </div>
+
+                    {/* Lower Ranks Grid (Optional) */}
+                    {!state.hideBelowTop3 && sortedPlayers.length > 3 && (
+                        <div className="bg-slate-800/80 backdrop-blur-sm rounded-xl p-4 border border-slate-700 max-h-[25vh] overflow-y-auto">
+                            <h3 className="text-center text-slate-400 text-sm font-bold uppercase mb-4 sticky top-0 bg-slate-800 py-2">Runner Ups</h3>
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                {sortedPlayers.slice(3).map((player, i) => (
+                                    <div key={player.id} className="flex items-center gap-3 bg-slate-700/50 p-2 rounded border border-slate-600">
+                                        <div className="bg-slate-600 w-8 h-8 rounded flex items-center justify-center font-bold text-slate-300 text-sm">{i + 4}</div>
+                                        <div>
+                                            <div className="font-bold text-sm truncate w-24">{player.name}</div>
+                                            <div className="text-xs text-slate-400 font-mono">{player.score} pts</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+          </div>
+        )}
+      </main>
     </div>
   );
 };
