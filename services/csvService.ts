@@ -80,10 +80,12 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
 
     // Refined regex to match various Google Drive URL formats and capture the ID
     // Matches:
-    // - drive.google.com/file/d/ID/...
+    // - drive.google.com/file/d/ID/... (with or without query params)
     // - drive.google.com/open?id=ID
     // - drive.google.com/uc?id=ID
-    const driveRegex = /(?:drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)|docs\.google\.com\/file\/d\/)([-a-zA-Z0-9_]+)/;
+    // - docs.google.com/file/d/ID
+    // It looks for the ID string which is a long alphanumeric sequence usually after /d/ or id=
+    const driveRegex = /(?:(?:\/d\/)|(?:id=))([a-zA-Z0-9_-]{15,})/;
     const match = trimmed.match(driveRegex);
     
     if (match && match[1]) {
@@ -167,16 +169,11 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
          explanation = cols[6] || "解説はありません";
       }
 
-      // Check if Question (Column A) is actually a URL (Legacy support or simple format)
-      // If A is a URL and L is empty, treat A as image and leave text blank? 
-      // For now, we only use L for explicit question images as requested.
-
       questions.push({
         id: `csv-${Date.now()}-${i}`,
         text: cols[0] || "無題の問題",
         options: [cols[1] || "", cols[2] || "", cols[3] || "", cols[4] || ""],
         // Sanitization: If no valid image links exist in the array, use undefined to keep clean state
-        // Also ensure individual array items are empty strings rather than undefined/null if they are blanks
         optionImages: optionImages.some(img => img !== "") ? optionImages : undefined,
         correctIndex: Math.max(0, Math.min(3, correctIndex)), // Bound to 0-3
         explanation: explanation,
