@@ -78,20 +78,19 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
     const trimmed = url.trim();
     if (!trimmed) return "";
 
-    // Refined regex to match various Google Drive URL formats and capture the ID
+    // Regex to capture the file ID from various Google Drive URL formats
     // Matches:
-    // - drive.google.com/file/d/ID/... (with or without query params)
+    // - drive.google.com/file/d/ID/view?usp=drive_link
+    // - drive.google.com/file/d/ID
     // - drive.google.com/open?id=ID
-    // - drive.google.com/uc?id=ID
-    // - docs.google.com/file/d/ID
-    // It looks for the ID string which is a long alphanumeric sequence usually after /d/ or id=
-    const driveRegex = /(?:(?:\/d\/)|(?:id=))([a-zA-Z0-9_-]{15,})/;
+    // Captures alphanumeric IDs of at least 25 characters to be safe
+    const driveRegex = /(?:(?:\/d\/)|(?:id=))([a-zA-Z0-9_-]{25,})/;
     const match = trimmed.match(driveRegex);
     
     if (match && match[1]) {
-      // Use lh3.googleusercontent.com for more reliable image embedding
-      // This bypasses some of the 403 Forbidden issues with drive.google.com/uc
-      return `https://lh3.googleusercontent.com/d/${match[1]}`;
+      // Use standard export=view which redirects to the correct content type
+      // This is generally more reliable than lh3.googleusercontent.com for private/shared links
+      return `https://drive.google.com/uc?export=view&id=${match[1]}`;
     }
     return trimmed;
   };
