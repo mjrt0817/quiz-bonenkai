@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
-import { Users, CheckCircle, Sparkles, Monitor, Medal, Trophy, AlertTriangle } from 'lucide-react';
+import { Users, CheckCircle, Sparkles, Monitor, Medal, Trophy, AlertTriangle, Image as ImageIcon } from 'lucide-react';
 
 interface HostScreenProps {
   state: HostState;
@@ -51,6 +51,19 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   // Current Question Data
   const currentQuestion = state.questions[state.currentQuestionIndex];
   const hasImages = currentQuestion?.optionImages && currentQuestion.optionImages.some(img => img && img.trim() !== "");
+
+  // Error handler for images
+  const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    e.currentTarget.style.display = 'none';
+    // Optionally show fallback text or icon if needed
+    const parent = e.currentTarget.parentElement;
+    if (parent) {
+        const fallback = document.createElement('div');
+        fallback.className = "flex flex-col items-center justify-center h-full text-slate-400 p-2 text-center";
+        fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg><span class="text-xs mt-1">Image Error</span>';
+        parent.appendChild(fallback);
+    }
+  };
 
   return (
     <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
@@ -202,7 +215,13 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                             // Image Mode
                             <div className="flex-1 flex flex-col h-full">
                                 <div className="flex-1 relative bg-white">
-                                    <img src={imgUrl} alt={`Option ${idx}`} className="absolute inset-0 w-full h-full object-contain p-2" />
+                                    <img 
+                                      src={imgUrl} 
+                                      alt={`Option ${idx}`} 
+                                      className="absolute inset-0 w-full h-full object-contain p-2" 
+                                      referrerPolicy="no-referrer"
+                                      onError={handleImageError}
+                                    />
                                 </div>
                                 <div className="p-4 text-center bg-black/10 min-h-[60px] flex items-center justify-center">
                                     <span className="text-2xl font-bold text-white drop-shadow-md">{option}</span>
@@ -239,6 +258,8 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                             src={currentQuestion.optionImages[currentQuestion.correctIndex]} 
                             alt="Correct" 
                             className="h-48 object-contain"
+                            referrerPolicy="no-referrer"
+                            onError={handleImageError}
                         />
                      </div>
                  )}
