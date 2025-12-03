@@ -78,15 +78,10 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
     const trimmed = url.trim();
     if (!trimmed) return "";
 
-    // Optimized Regex to capture the file ID from various Google Drive URL formats
-    // Matches:
-    // - https://drive.google.com/file/d/ID/view?usp=drive_link
-    // - https://drive.google.com/file/d/ID
-    // - https://drive.google.com/open?id=ID
-    // - https://drive.google.com/uc?id=ID
-    // It looks for a sequence of 25+ alphanumeric chars/underscores/hyphens
-    // preceded by /d/ or id=
-    const driveRegex = /(?:\/d\/|id=)([a-zA-Z0-9_-]{25,})/;
+    // Optimized Regex to capture the File ID from various Google Drive URL formats
+    // Matches ID that follows /d/ or id=
+    // Capture until we hit / or ? or & or end of string
+    const driveRegex = /(?:\/d\/|id=)([a-zA-Z0-9_-]{15,})/;
     const match = trimmed.match(driveRegex);
     
     if (match && match[1]) {
@@ -176,7 +171,7 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
         id: `csv-${Date.now()}-${i}`,
         text: cols[0] || "無題の問題",
         options: [cols[1] || "", cols[2] || "", cols[3] || "", cols[4] || ""],
-        // Sanitization: If no valid image links exist in the array, set to undefined
+        // Sanitization: If no valid image links exist in the array, set to undefined to clean up data
         optionImages: optionImages.some(img => img !== "") ? optionImages : undefined,
         correctIndex: Math.max(0, Math.min(3, correctIndex)), // Bound to 0-3
         explanation: explanation,
