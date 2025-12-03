@@ -85,7 +85,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
       
       {!isTitleOnlyMode && (
-        <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10 shrink-0">
+        <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10 shrink-0 h-16">
             <div className="flex items-center gap-4">
             <div className="bg-indigo-600 p-2 rounded-lg">
                 <Monitor size={24} />
@@ -97,7 +97,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
             </div>
             
             {state.gameState === GameState.PLAYING_QUESTION && isFinalQuestion && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-8 py-2 rounded-full font-black text-xl animate-pulse shadow-[0_0_20px_rgba(220,38,38,0.6)] flex items-center gap-2 border-2 border-white">
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-8 py-2 rounded-full font-black text-xl animate-pulse shadow-[0_0_20px_rgba(220,38,38,0.6)] flex items-center gap-2 border-2 border-white z-20">
                     <AlertTriangle /> ⚠️ 最終問題 ⚠️ <AlertTriangle />
                 </div>
             )}
@@ -114,7 +114,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
         </header>
       )}
 
-      <main className="flex-1 relative flex flex-col overflow-hidden">
+      <main className="flex-1 relative flex flex-col overflow-hidden min-h-0">
         
         {(state.gameState === GameState.SETUP || state.gameState === GameState.LOBBY) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -209,18 +209,18 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                />
             </div>
             
-            <div className="mb-4 text-center shrink-0">
-               <h2 className={`font-bold leading-tight mb-2 drop-shadow-md ${currentQuestion?.questionImage ? 'text-2xl' : 'text-5xl md:text-6xl mt-8'}`}>
+            <div className={`w-full flex flex-col items-center justify-center shrink-0 ${currentQuestion?.questionImage ? 'h-[65vh] mb-2' : 'h-auto mb-8'}`}>
+               <h2 className={`font-bold leading-tight drop-shadow-md text-center ${currentQuestion?.questionImage ? 'text-2xl mb-2 shrink-0' : 'text-5xl md:text-6xl'}`}>
                   <span className="text-indigo-400 mr-4">Q.{state.currentQuestionIndex + 1}</span>
                   {currentQuestion?.text}
                </h2>
                
                {currentQuestion?.questionImage && (
-                   <div className="mx-auto h-[25vh] w-auto max-w-full rounded-xl overflow-hidden border-2 border-slate-700 bg-black/50 shadow-lg relative inline-block">
+                   <div className="flex-1 w-full flex justify-center items-center overflow-hidden rounded-xl border-2 border-slate-700 bg-black/50 shadow-lg relative min-h-0">
                         <img 
                             src={currentQuestion.questionImage} 
                             alt="Question" 
-                            className="h-full w-auto object-contain"
+                            className="h-full w-full object-contain"
                             referrerPolicy="no-referrer"
                             onError={handleImageError}
                         />
@@ -234,15 +234,15 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                  return (
                   <div
                     key={idx}
-                    className={`${COLORS[idx]} w-full h-full rounded-2xl shadow-xl flex flex-col items-center justify-center text-white relative overflow-hidden border-4 border-white/10`}
+                    className={`${COLORS[idx]} w-full h-full rounded-2xl shadow-xl flex flex-col items-center justify-center text-white relative overflow-hidden border-2 border-white/10`}
                   >
-                     <div className="absolute left-4 top-4 w-12 h-12 bg-black/20 rounded-full flex items-center justify-center font-black text-2xl z-10 border-2 border-white/20">
+                     <div className="absolute left-2 top-2 w-10 h-10 bg-black/20 rounded-full flex items-center justify-center font-black text-xl z-10 border-2 border-white/20">
                        {BTN_LABELS[idx]}
                      </div>
                      
                      {imgUrl ? (
                          <>
-                            <div className="flex-1 w-full bg-white relative">
+                            <div className="flex-1 w-full h-full bg-white relative">
                                 <img 
                                     src={imgUrl} 
                                     alt={opt} 
@@ -251,9 +251,12 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                                     onError={handleImageError}
                                 />
                             </div>
-                            <div className="w-full bg-black/40 p-2 text-center font-bold text-xl md:text-2xl backdrop-blur-sm shrink-0">
-                                {opt}
-                            </div>
+                            {/* 画像がある場合はテキストは不要、もしくは小さく表示 */}
+                            {opt && (
+                                <div className="w-full bg-black/60 py-1 text-center font-bold text-lg backdrop-blur-sm shrink-0 absolute bottom-0 left-0">
+                                    {opt}
+                                </div>
+                            )}
                          </>
                      ) : (
                          <span className="text-3xl md:text-5xl font-bold text-center px-4 leading-snug drop-shadow-md">{opt}</span>
@@ -272,29 +275,35 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
             </div>
 
             {state.gameState === GameState.PLAYING_RESULT && (
-                <div className="z-10 text-center animate-in zoom-in duration-300">
-                    <h2 className="text-3xl font-bold text-slate-400 mb-4 uppercase tracking-widest">Correct Answer</h2>
-                    <div className="text-6xl md:text-8xl font-black text-white mb-8 drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]">
-                        {currentQuestion?.options[currentQuestion.correctIndex]}
+                <div className="z-10 text-center animate-in zoom-in duration-300 w-full h-full flex flex-col justify-center">
+                    <h2 className="text-3xl font-bold text-slate-400 mb-2 uppercase tracking-widest shrink-0">Correct Answer</h2>
+                    
+                    <div className="flex-1 min-h-0 flex flex-col items-center justify-center mb-4">
+                        {currentQuestion?.optionImages?.[currentQuestion.correctIndex] ? (
+                             <div className="h-full max-h-[40vh] w-auto aspect-square rounded-xl overflow-hidden border-4 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)] bg-white relative">
+                                 <img 
+                                    src={currentQuestion.optionImages[currentQuestion.correctIndex]} 
+                                    alt="Correct Answer" 
+                                    className="h-full w-full object-contain"
+                                    referrerPolicy="no-referrer"
+                                    onError={handleImageError}
+                                 />
+                                 <div className="absolute bottom-0 inset-x-0 bg-green-600/90 text-white font-bold text-xl py-2">
+                                     {currentQuestion?.options[currentQuestion.correctIndex]}
+                                 </div>
+                             </div>
+                        ) : (
+                            <div className="text-6xl md:text-8xl font-black text-white drop-shadow-[0_0_25px_rgba(255,255,255,0.4)]">
+                                {currentQuestion?.options[currentQuestion.correctIndex]}
+                            </div>
+                        )}
                     </div>
                     
-                    {currentQuestion?.optionImages?.[currentQuestion.correctIndex] && (
-                        <div className="mx-auto h-[25vh] rounded-xl overflow-hidden border-4 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.4)] mb-8 bg-white">
-                             <img 
-                                src={currentQuestion.optionImages[currentQuestion.correctIndex]} 
-                                alt="Correct Answer" 
-                                className="h-full w-full object-contain"
-                                referrerPolicy="no-referrer"
-                                onError={handleImageError}
-                             />
-                        </div>
-                    )}
-                    
-                    <div className="bg-slate-800/80 backdrop-blur-md p-8 rounded-3xl border border-slate-700 max-w-4xl mx-auto shadow-2xl">
+                    <div className="bg-slate-800/80 backdrop-blur-md p-6 rounded-3xl border border-slate-700 max-w-4xl mx-auto shadow-2xl shrink-0 w-full">
                         <h3 className="text-xl font-bold text-indigo-400 mb-2 flex items-center justify-center gap-2">
                             <Sparkles size={20}/> 解説
                         </h3>
-                        <p className="text-2xl text-slate-100 leading-relaxed">
+                        <p className="text-xl md:text-2xl text-slate-100 leading-relaxed line-clamp-4">
                             {currentQuestion?.explanation}
                         </p>
                     </div>
