@@ -45,6 +45,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   });
 
   // Determines if we are in the "Title Only" mode of the Lobby
+  // Logic: In SETUP or LOBBY, if isLobbyDetailsVisible is FALSE, show Title/Image only.
   const isTitleOnlyMode = (state.gameState === GameState.LOBBY || state.gameState === GameState.SETUP) && !state.isLobbyDetailsVisible;
 
   // Current Question Data
