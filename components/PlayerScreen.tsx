@@ -158,6 +158,18 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
            />
         </div>
 
+        {/* Question Image */}
+        {currentQuestion?.questionImage && (
+             <div className="mb-4 h-[180px] w-full flex justify-center bg-slate-800 rounded-xl overflow-hidden shadow-md">
+                 <img 
+                    src={currentQuestion.questionImage}
+                    alt="Question"
+                    className="h-full w-full object-contain"
+                    referrerPolicy="no-referrer"
+                 />
+             </div>
+        )}
+
         <div className="flex-1 grid grid-cols-2 gap-4 content-center">
            {currentQuestion?.options.map((opt, idx) => {
              const imgUrl = currentQuestion.optionImages?.[idx];
