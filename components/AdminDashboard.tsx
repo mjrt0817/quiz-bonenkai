@@ -177,12 +177,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const slot = soundSlots[index];
         if (!slot.url) return;
         
-        // Safety check for ref array
-        if (!audioRefs.current) return;
+        // Ensure refs array is initialized
+        if (!audioRefs.current) {
+            audioRefs.current = new Array(6).fill(null);
+        }
 
         let audio = audioRefs.current[index];
 
-        // Ensure audio instance exists
+        // Create audio instance if missing
         if (!audio) {
             audio = new Audio(slot.url);
             audioRefs.current[index] = audio;
@@ -197,8 +199,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         audio.onerror = null;
 
         audio.onended = () => {
-             // Only update state if not looping
-             if (audioRefs.current?.[index]?.loop) return;
+             // If looping, do not stop UI
+             if (audio.loop) return;
              setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
         };
 
@@ -208,27 +210,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
         };
 
+        // --- Playback Control ---
         if (slot.isPlaying) {
             // Restart (Pon-dashi)
             audio.currentTime = 0;
             audio.play().catch(e => {
                  console.error("Replay error", e);
                  addLog(`Replay Error: ${e.message}`);
+                 // If error, force stop UI
+                 setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
             });
         } else {
             // Start
-            audio.play().then(() => {
-                // Play started
-            }).catch(e => {
-                console.error("Play error", e);
-                addLog(`Play Error: ${e.message}`);
-                setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-            });
+            audio.currentTime = 0; // Ensure start from beginning
+            const playPromise = audio.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.catch(e => {
+                    console.error("Play error", e);
+                    addLog(`Play Error: ${e.message}`);
+                    setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
+                });
+            }
+            
+            // Update UI to playing
             setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
         }
         
     } catch (e: any) {
         addLog(`Sound Logic Error: ${e.message}`);
+        setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
     }
   };
 
