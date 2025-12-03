@@ -78,20 +78,23 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
     const trimmed = url.trim();
     if (!trimmed) return "";
 
-    // Regex to capture the file ID from various Google Drive URL formats
+    // Optimized Regex to capture the file ID from various Google Drive URL formats
     // Matches:
-    // - drive.google.com/file/d/ID/view?usp=drive_link
-    // - drive.google.com/file/d/ID
-    // - drive.google.com/open?id=ID
-    // Captures alphanumeric IDs of at least 25 characters to be safe
-    const driveRegex = /(?:(?:\/d\/)|(?:id=))([a-zA-Z0-9_-]{25,})/;
+    // - https://drive.google.com/file/d/ID/view?usp=drive_link
+    // - https://drive.google.com/file/d/ID
+    // - https://drive.google.com/open?id=ID
+    // - https://drive.google.com/uc?id=ID
+    // It looks for a sequence of 25+ alphanumeric chars/underscores/hyphens
+    // preceded by /d/ or id=
+    const driveRegex = /(?:\/d\/|id=)([a-zA-Z0-9_-]{25,})/;
     const match = trimmed.match(driveRegex);
     
     if (match && match[1]) {
-      // Use standard export=view which redirects to the correct content type
-      // This is generally more reliable than lh3.googleusercontent.com for private/shared links
+      // Use standard export=view which redirects to the correct content type and is image-friendly
       return `https://drive.google.com/uc?export=view&id=${match[1]}`;
     }
+    
+    // If it's a direct lh3 link or other valid image URL, return as is
     return trimmed;
   };
 
@@ -152,7 +155,8 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
          // NEW FORMAT with Images
          // F, G, H, I are images
          const rawImages = [cols[5], cols[6], cols[7], cols[8]];
-         optionImages = rawImages.map(convertToDirectLink);
+         // Convert empty strings to "" but valid URLs to direct links
+         optionImages = rawImages.map(url => url ? convertToDirectLink(url) : "");
          
          correctIndex = isNaN(colJ) ? 0 : colJ - 1;
          explanation = cols[10] || "解説はありません";
@@ -172,7 +176,7 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
         id: `csv-${Date.now()}-${i}`,
         text: cols[0] || "無題の問題",
         options: [cols[1] || "", cols[2] || "", cols[3] || "", cols[4] || ""],
-        // Sanitization: If no valid image links exist in the array, use undefined to keep clean state
+        // Sanitization: If no valid image links exist in the array, set to undefined
         optionImages: optionImages.some(img => img !== "") ? optionImages : undefined,
         correctIndex: Math.max(0, Math.min(3, correctIndex)), // Bound to 0-3
         explanation: explanation,
