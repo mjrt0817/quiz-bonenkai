@@ -72,23 +72,42 @@ export const parseCSVQuiz = async (inputUrl: string): Promise<QuizQuestion[]> =>
     }
   }
 
-  // --- Helper: Convert Google Drive Links to Direct Links ---
+  // --- Helper: Convert Drive/Box Links to Direct Links ---
   const convertToDirectLink = (url: string | undefined): string => {
     if (!url) return "";
     const trimmed = url.trim();
     if (!trimmed) return "";
 
-    // 1. Try to extract ID from various Google Drive URL formats
+    // --- Google Drive ---
     // Matches ID that follows /d/ or id= or file/d/
     // Handles query parameters like ?usp=drive_link
     const driveRegex = /(?:\/d\/|id=|file\/d\/)([a-zA-Z0-9_-]{15,})/;
-    const match = trimmed.match(driveRegex);
+    const driveMatch = trimmed.match(driveRegex);
     
-    if (match && match[1]) {
-      const fileId = match[1];
-      // Use lh3.googleusercontent.com/d/{ID} format
-      // This accesses the raw image data directly and is often friendlier to <img> tags than drive.google.com/uc
+    if (driveMatch && driveMatch[1]) {
+      const fileId = driveMatch[1];
+      // Use lh3.googleusercontent.com/d/{ID} format for best embedding reliability
       return `https://lh3.googleusercontent.com/d/${fileId}`;
+    }
+
+    // --- Box.com ---
+    // Matches https://*.box.com/s/{hash}
+    const boxRegex = /box\.com\/s\/([a-zA-Z0-9]+)/;
+    const boxMatch = trimmed.match(boxRegex);
+    
+    if (boxMatch && boxMatch[1]) {
+        const hash = boxMatch[1];
+        let domain = "app.box.com";
+        try {
+            const urlObj = new URL(trimmed);
+            domain = urlObj.hostname;
+        } catch (e) {
+            // fallback
+        }
+        // Convert /s/{hash} to /shared/static/{hash}.jpg
+        // Box usually serves the correct content-type even if we append .jpg to a png file,
+        // but the extension helps the <img> tag and browser treat it as an image initially.
+        return `https://${domain}/shared/static/${hash}.jpg`;
     }
     
     // If it's already a direct link or other valid image URL, return as is
