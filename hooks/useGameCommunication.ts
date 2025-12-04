@@ -14,6 +14,7 @@ const INITIAL_HOST_STATE: HostState = {
   roomCode: 'EVENT',
   timeLimit: 20,
   questionStartTime: null,
+  isTimerRunning: false,
   rankingRevealStage: 0,
   isRankingResultVisible: false,
   hideBelowTop3: false,
@@ -148,8 +149,6 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
       if(!p || !p.id) return;
 
       // Calculate Time Difference (Tie Breaker)
-      // We accumulate time taken for ALL answers (or you could restrict to only correct ones)
-      // Here we accumulate time for any answer submitted to break ties based on "speed of participation"
       if (p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined && p.lastAnswerTime && questionStartTime) {
           const timeTaken = Math.max(0, p.lastAnswerTime - questionStartTime);
           const currentTotal = p.totalResponseTime || 0;
