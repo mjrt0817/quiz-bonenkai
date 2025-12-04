@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz, convertToDirectLink } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal, Monitor, Link } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal, Monitor, Link, Timer } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -38,6 +38,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 50));
   };
 
+  // --- Sound Slots for Manual Play (1-6) ---
   const [soundSlots, setSoundSlots] = useState<SoundSlot[]>(
     Array.from({ length: 6 }, (_, i) => ({
       id: i + 1,
@@ -49,13 +50,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }))
   );
   
-  const audioRefs = useRef<(HTMLAudioElement | null)[]>(new Array(6).fill(null));
+  // --- Auto Sounds (Intro & Thinking) ---
+  const [introSound, setIntroSound] = useState<{file: File|null, url: string|null}>({ file: null, url: null });
+  const [thinkingSound, setThinkingSound] = useState<{file: File|null, url: string|null}>({ file: null, url: null });
 
+  const audioRefs = useRef<(HTMLAudioElement | null)[]>(new Array(6).fill(null));
+  const introAudioRef = useRef<HTMLAudioElement | null>(null);
+  const thinkingAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       soundSlots.forEach(slot => {
         if (slot.url) URL.revokeObjectURL(slot.url);
       });
+      if (introSound.url) URL.revokeObjectURL(introSound.url);
+      if (thinkingSound.url) URL.revokeObjectURL(thinkingSound.url);
+
       if (audioRefs.current) {
         audioRefs.current.forEach(audio => {
           if (audio) {
@@ -65,6 +76,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             audio.onerror = null;
           }
         });
+      }
+      if (introAudioRef.current) {
+          introAudioRef.current.pause();
+          introAudioRef.current.src = '';
+      }
+      if (thinkingAudioRef.current) {
+          thinkingAudioRef.current.pause();
+          thinkingAudioRef.current.src = '';
       }
     };
   }, []);
@@ -120,10 +139,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     addLog("大会画像をクリアしました");
   };
 
+  // --- Sound Logic ---
+
   const handleFileSelect = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Cleanup old
       if (audioRefs.current && audioRefs.current[index]) {
         const oldAudio = audioRefs.current[index];
         if (oldAudio) {
@@ -134,15 +154,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         }
         audioRefs.current[index] = null;
       }
-
       const oldSlot = soundSlots[index];
       if (oldSlot.url) URL.revokeObjectURL(oldSlot.url);
       
       const url = URL.createObjectURL(file);
-      
-      setSoundSlots(prev => prev.map((slot, i) => 
-        i === index ? { ...slot, file, url, isPlaying: false } : slot
-      ));
+      setSoundSlots(prev => prev.map((slot, i) => i === index ? { ...slot, file, url, isPlaying: false } : slot));
       addLog(`Slot #${index + 1}: ファイルをセットしました (${file.name})`);
     }
   };
@@ -153,14 +169,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (!slot.url) return;
         
         if (!audioRefs.current) audioRefs.current = new Array(6).fill(null);
-
         let audio = audioRefs.current[index];
 
         if (!audio) {
             audio = new Audio(slot.url);
             audioRefs.current[index] = audio;
         }
-
         audio.volume = slot.volume;
         audio.loop = slot.isLoop;
         audio.onended = null;
@@ -170,7 +184,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
              if (audio.loop) return;
              setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
         };
-
         audio.onerror = (e) => {
             console.error(`Audio error slot ${index}`, e);
             addLog(`Slot #${index + 1} Error: 再生失敗`);
@@ -181,22 +194,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             audio.currentTime = 0;
             audio.play().catch(e => {
                  console.error("Replay error", e);
-                 addLog(`Replay Error: ${e.message}`);
                  setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
             });
         } else {
             audio.currentTime = 0; 
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(e => {
-                    console.error("Play error", e);
-                    addLog(`Play Error: ${e.message}`);
-                    setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-                });
-            }
+            audio.play().catch(e => {
+                console.error("Play error", e);
+                setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
+            });
             setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
         }
-        
     } catch (e: any) {
         addLog(`Sound Logic Error: ${e.message}`);
         setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
@@ -223,6 +230,64 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
      }));
   };
 
+  // --- Auto Sound Handlers ---
+  const handleIntroSoundSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          if (introSound.url) URL.revokeObjectURL(introSound.url);
+          const url = URL.createObjectURL(file);
+          setIntroSound({ file, url });
+          addLog("問題表示時の効果音をセットしました");
+      }
+  };
+
+  const handleThinkingSoundSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          if (thinkingSound.url) URL.revokeObjectURL(thinkingSound.url);
+          const url = URL.createObjectURL(file);
+          setThinkingSound({ file, url });
+          addLog("シンキングタイムのBGMをセットしました");
+      }
+  };
+
+  const playIntroSound = () => {
+      if (introSound.url) {
+          if (introAudioRef.current) {
+              introAudioRef.current.pause();
+              introAudioRef.current.currentTime = 0;
+          } else {
+              introAudioRef.current = new Audio(introSound.url);
+          }
+          introAudioRef.current.src = introSound.url;
+          introAudioRef.current.play().catch(e => console.error("Intro play fail", e));
+      }
+  };
+
+  const playThinkingSound = () => {
+      if (thinkingSound.url) {
+          if (thinkingAudioRef.current) {
+              thinkingAudioRef.current.pause();
+              thinkingAudioRef.current.currentTime = 0;
+          } else {
+              thinkingAudioRef.current = new Audio(thinkingSound.url);
+              thinkingAudioRef.current.loop = true;
+          }
+          thinkingAudioRef.current.src = thinkingSound.url;
+          thinkingAudioRef.current.play().catch(e => console.error("Thinking play fail", e));
+      }
+  };
+
+  const stopThinkingSound = () => {
+      if (thinkingAudioRef.current) {
+          thinkingAudioRef.current.pause();
+          thinkingAudioRef.current.currentTime = 0;
+      }
+  };
+
+
+  // --- Game Control ---
+
   const loadQuestions = async () => {
     if (!csvUrl) return;
     setIsLoading(true);
@@ -230,10 +295,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     
     try {
       const questions = await parseCSVQuiz(csvUrl);
-      
-      if (!Array.isArray(questions) || questions.length === 0) {
-        throw new Error("有効な問題データが見つかりませんでした。");
-      }
+      if (!Array.isArray(questions) || questions.length === 0) throw new Error("有効な問題データが見つかりませんでした。");
 
       updateState(prev => ({
         ...prev,
@@ -262,21 +324,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       ...prev,
       currentQuestionIndex: 0,
       gameState: GameState.PLAYING_QUESTION,
-      questionStartTime: Date.now(),
+      questionStartTime: null, // Timer not started yet
+      isTimerRunning: false,
       timeLimit: 20,
       rankingRevealStage: 0,
       isRankingResultVisible: false
     }));
-    addLog("クイズを開始しました");
+    playIntroSound();
+    addLog("クイズを開始しました (タイマー待機中)");
+  };
+
+  const startTimer = () => {
+      updateState(prev => ({
+          ...prev,
+          isTimerRunning: true,
+          questionStartTime: Date.now()
+      }));
+      playThinkingSound();
+      addLog("タイマースタート！");
   };
 
   const showResults = async () => {
+    stopThinkingSound();
     addLog("回答締め切り・集計中...");
     await calculateAndSaveScores();
     updateState(prev => ({
       ...prev,
       gameState: GameState.PLAYING_RESULT,
-      questionStartTime: null 
+      questionStartTime: null,
+      isTimerRunning: false 
     }));
     addLog("正解を表示しました");
   };
@@ -299,9 +375,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         ...prev,
         currentQuestionIndex: nextIndex,
         gameState: GameState.PLAYING_QUESTION,
-        questionStartTime: Date.now()
+        questionStartTime: null, // Reset timer
+        isTimerRunning: false
       };
     });
+    playIntroSound();
   };
 
   const goToStage = (stage: number) => {
@@ -332,8 +410,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       rankingRevealStage: 0,
       isRankingResultVisible: false,
       hideBelowTop3: false,
-      isLobbyDetailsVisible: false
+      isLobbyDetailsVisible: false,
+      isTimerRunning: false
     }));
+    stopThinkingSound();
     addLog("ゲームをリセットしました");
   };
 
@@ -480,7 +560,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                     )}
                   </div>
-                  <p className="text-[10px] text-slate-400">Googleドライブの共有リンクに対応しています</p>
                 </div>
 
                 <div className="space-y-1 border-t pt-3">
@@ -536,21 +615,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         {state.hideBelowTop3 ? <EyeOff size={16}/> : <Eye size={16}/>}
                         {state.hideBelowTop3 ? '最終結果で4位以下を隠す (ON)' : '最終結果で4位以下を表示 (OFF)'}
                     </button>
-                    <p className="text-[10px] text-slate-400 text-center mt-1">※最終結果発表時の表示設定</p>
                 </div>
 
                 {state.gameState === GameState.LOBBY && (
                   <div className="space-y-2">
                      <button onClick={startGame} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700">
-                        クイズ開始！
+                        クイズ開始 (問題表示)
                      </button>
                   </div>
                 )}
 
                 {state.gameState === GameState.PLAYING_QUESTION && (
-                  <button onClick={showResults} className="w-full bg-indigo-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-indigo-700">
-                     正解を表示 (締め切り)
-                  </button>
+                  <div className="space-y-3">
+                      {!state.isTimerRunning ? (
+                          <button onClick={startTimer} className="w-full bg-orange-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-orange-700 flex items-center justify-center gap-2 animate-pulse">
+                             <Timer size={24}/> タイマースタート！
+                          </button>
+                      ) : (
+                          <div className="w-full bg-slate-100 text-slate-500 py-2 rounded-lg text-center text-sm font-bold border border-slate-200">
+                              シンキングタイム中...
+                          </div>
+                      )}
+                      
+                      <button onClick={showResults} disabled={!state.isTimerRunning} className="w-full bg-indigo-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-indigo-700 disabled:opacity-50 disabled:bg-slate-400">
+                         正解を表示 (締め切り)
+                      </button>
+                  </div>
                 )}
 
                 {state.gameState === GameState.PLAYING_RESULT && (
@@ -564,18 +654,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="text-center text-yellow-600 font-bold text-lg mb-2">
                       最終結果発表中
                     </div>
-                    <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-center mb-2">
-                        Current Stage: 
-                        <span className="font-bold ml-2">
-                            {state.rankingRevealStage === 0 ? '4位以下' : 
-                             state.rankingRevealStage === 1 ? '3位発表' : 
-                             state.rankingRevealStage === 2 ? '2位発表' : '1位発表'}
-                        </span>
-                        <div className="mt-1 text-xs">
-                            State: <span className={`font-bold ${state.isRankingResultVisible ? 'text-green-600' : 'text-slate-500'}`}>{state.isRankingResultVisible ? 'OPEN' : 'SUSPENSE'}</span>
-                        </div>
-                    </div>
-                    
                     {renderRankingControl()}
                   </div>
                 )}
@@ -591,24 +669,50 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <Music size={20} className="text-indigo-600"/>
                   <h2 className="font-bold text-lg text-slate-700">効果音 (Sound Board)</h2>
                </div>
+               
+               {/* Auto Play Settings */}
+               <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-4">
+                   <div className="flex-1 space-y-2">
+                       <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Monitor size={12}/> 問題表示時の効果音</label>
+                       <div className="flex gap-2 items-center">
+                           <label className="flex-1 border rounded bg-white px-2 py-1 text-xs cursor-pointer hover:bg-slate-50 truncate">
+                               {introSound.file ? introSound.file.name : "ファイル選択..."}
+                               <input type="file" accept="audio/*" className="hidden" onChange={handleIntroSoundSelect} />
+                           </label>
+                           {introSound.url && <button onClick={() => { if(introAudioRef.current) { introAudioRef.current.currentTime=0; introAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>}
+                       </div>
+                   </div>
+                   <div className="flex-1 space-y-2">
+                       <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> シンキングタイムBGM (Loop)</label>
+                       <div className="flex gap-2 items-center">
+                           <label className="flex-1 border rounded bg-white px-2 py-1 text-xs cursor-pointer hover:bg-slate-50 truncate">
+                               {thinkingSound.file ? thinkingSound.file.name : "ファイル選択..."}
+                               <input type="file" accept="audio/*" className="hidden" onChange={handleThinkingSoundSelect} />
+                           </label>
+                           {thinkingSound.url && <button onClick={() => { if(thinkingAudioRef.current) { thinkingAudioRef.current.currentTime=0; thinkingAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>}
+                       </div>
+                   </div>
+               </div>
+
+               {/* Manual Slots */}
                <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
                   {soundSlots.map((slot, index) => (
                     <div key={slot.id} className={`border rounded-lg p-2 flex flex-col gap-2 ${slot.isPlaying ? 'border-green-400 bg-green-50' : 'border-slate-200 bg-slate-50'}`}>
                         <div className="flex justify-between items-center text-xs font-bold text-slate-500">
-                           <span>#{slot.id}</span>
+                           <span>Slot #{slot.id}</span>
                            <button onClick={() => toggleLoop(index)} className={`${slot.isLoop ? 'text-indigo-600' : 'text-slate-300'} hover:text-indigo-500`} title="Loop BGM">
                               <Repeat size={14}/>
                            </button>
                         </div>
                         
                         {!slot.url ? (
-                           <label className="flex flex-col items-center justify-center h-20 border-2 border-dashed border-slate-300 rounded cursor-pointer hover:bg-slate-100 transition">
-                              <Upload size={20} className="text-slate-400 mb-1"/>
+                           <label className="flex flex-col items-center justify-center h-16 border-2 border-dashed border-slate-300 rounded cursor-pointer hover:bg-slate-100 transition">
+                              <Upload size={16} className="text-slate-400 mb-1"/>
                               <span className="text-[10px] text-slate-500">Select File</span>
                               <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleFileSelect(index, e)}/>
                            </label>
                         ) : (
-                           <div className="flex flex-col gap-2 h-20 justify-center">
+                           <div className="flex flex-col gap-2 h-16 justify-center">
                               <div className="text-xs truncate font-bold text-slate-700" title={slot.file?.name || 'File'}>
                                  {slot.file?.name}
                               </div>
@@ -629,9 +733,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         )}
                     </div>
                   ))}
-               </div>
-               <div className="px-4 pb-2 text-[10px] text-slate-400 text-right">
-                  ※ PC内のファイルを一時的に読み込みます。
                </div>
             </div>
 
