@@ -34,6 +34,7 @@ export interface HostState {
   roomCode: string;
   timeLimit: number; // in seconds
   questionStartTime: number | null; // Timestamp when question started
+  isTimerRunning: boolean; // Controls if the countdown is active
   rankingRevealStage: number; // 0: Show all/lower, 1: Show 3rd, 2: Show 2nd, 3: Show 1st
   isRankingResultVisible: boolean; // Controls whether the current stage result is revealed (true) or hidden/suspense (false)
   hideBelowTop3: boolean; // Option to hide ranks 4 and below
