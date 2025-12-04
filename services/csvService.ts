@@ -1,41 +1,25 @@
 import { QuizQuestion } from "../types";
 
-// --- Helper: Convert Drive/Box Links to Direct Links ---
+// --- Helper: Convert Drive Links to Direct Links ---
 export const convertToDirectLink = (url: string | undefined): string => {
   if (!url) return "";
   const trimmed = url.trim();
   if (!trimmed) return "";
 
   // --- Google Drive ---
-  // Matches ID that follows /d/ or id= or file/d/
+  // Matches ID that follows /d/, id=, file/d/, or open?id=
   // Handles query parameters like ?usp=drive_link
-  const driveRegex = /(?:\/d\/|id=|file\/d\/)([a-zA-Z0-9_-]{15,})/;
+  // Regex looks for 15+ alphanumeric chars/underscores/hyphens
+  const driveRegex = /(?:\/d\/|id=|file\/d\/|open\?id=)([-a-zA-Z0-9_]{15,})/;
   const driveMatch = trimmed.match(driveRegex);
   
   if (driveMatch && driveMatch[1]) {
     const fileId = driveMatch[1];
     // Use lh3.googleusercontent.com/d/{ID} format for best embedding reliability
+    // HostScreen/PlayerScreen have fallback logic to 'uc?export=view' if this fails
     return `https://lh3.googleusercontent.com/d/${fileId}`;
   }
 
-  // --- Box.com ---
-  // Matches https://*.box.com/s/{hash}
-  const boxRegex = /box\.com\/s\/([a-zA-Z0-9]+)/;
-  const boxMatch = trimmed.match(boxRegex);
-  
-  if (boxMatch && boxMatch[1]) {
-      const hash = boxMatch[1];
-      let domain = "app.box.com";
-      try {
-          const urlObj = new URL(trimmed);
-          domain = urlObj.hostname;
-      } catch (e) {
-          // fallback
-      }
-      // Convert /s/{hash} to /shared/static/{hash}.jpg
-      return `https://${domain}/shared/static/${hash}.jpg`;
-  }
-  
   // If it's already a direct link or other valid image URL, return as is
   return trimmed;
 };
