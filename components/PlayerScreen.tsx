@@ -34,17 +34,18 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
 
   useEffect(() => {
     let timerId: any;
-    if (state.gameState === GameState.PLAYING_QUESTION && state.questionStartTime) {
+    // Only run timer if isTimerRunning is true
+    if (state.gameState === GameState.PLAYING_QUESTION && state.isTimerRunning && state.questionStartTime) {
       timerId = setInterval(() => {
         const elapsedSeconds = (Date.now() - (state.questionStartTime || 0)) / 1000;
         const remaining = Math.max(0, state.timeLimit - elapsedSeconds);
         setTimeLeft(remaining);
       }, 100);
     } else {
-      setTimeLeft(0);
+      setTimeLeft(state.timeLimit); // Reset to full time if not running
     }
     return () => clearInterval(timerId);
-  }, [state.gameState, state.questionStartTime, state.timeLimit]);
+  }, [state.gameState, state.questionStartTime, state.timeLimit, state.isTimerRunning]);
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -167,10 +168,16 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
 
         <div className="w-full h-2 bg-slate-800 rounded-full mb-2 overflow-hidden shrink-0">
            <div 
-             className={`h-full transition-all duration-100 ease-linear ${timeLeft < 5 ? 'bg-red-500' : 'bg-indigo-500'}`}
+             className={`h-full transition-all duration-100 ease-linear ${timeLeft < 5 && state.isTimerRunning ? 'bg-red-500' : 'bg-indigo-500'}`}
              style={{ width: `${(timeLeft / state.timeLimit) * 100}%` }}
            />
         </div>
+        
+        {!state.isTimerRunning && (
+             <div className="bg-orange-500 text-white text-center text-xs font-bold py-1 rounded mb-1 animate-pulse">
+                 ホストの開始合図をお待ちください...
+             </div>
+        )}
 
         {currentQuestion?.questionImage && (
              <div className="mb-2 h-[25vh] w-full flex justify-center bg-slate-800 rounded-xl overflow-hidden shadow-md shrink-0">
@@ -190,8 +197,9 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
              return (
               <button
                 key={idx}
-                onClick={() => onAnswer(idx)}
-                className={`${COLORS[idx]} w-full h-full rounded-xl shadow-lg flex flex-col items-center justify-center active:scale-95 transition-transform overflow-hidden relative border-2 border-white/10`}
+                onClick={() => state.isTimerRunning && onAnswer(idx)}
+                disabled={!state.isTimerRunning}
+                className={`${state.isTimerRunning ? COLORS[idx] : 'bg-slate-700 cursor-not-allowed grayscale'} w-full h-full rounded-xl shadow-lg flex flex-col items-center justify-center active:scale-95 transition-transform overflow-hidden relative border-2 border-white/10`}
               >
                 <div className="absolute left-2 top-2 w-8 h-8 bg-black/40 rounded-full flex items-center justify-center font-bold text-white text-sm z-20 border border-white/30 backdrop-blur-sm">
                   {BTN_LABELS[idx]}
