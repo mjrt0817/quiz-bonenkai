@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
-import { parseCSVQuiz } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal, Monitor } from 'lucide-react';
+import { parseCSVQuiz, convertToDirectLink } from '../services/csvService';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal, Monitor, Link } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -28,6 +28,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   const [csvUrl, setCsvUrl] = useState('');
   const [titleInput, setTitleInput] = useState(state.quizTitle || 'クイズ大会');
+  const [imageUrlInput, setImageUrlInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [debugError, setDebugError] = useState<string | null>(null);
@@ -106,21 +107,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }, [state.players]);
 
-  const handleTitleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 1024 * 1024) { 
-          alert("画像サイズが大きすぎます。1MB以下の画像を選択してください。");
-          return;
-      }
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const base64 = ev.target?.result as string;
-        updateState(prev => ({ ...prev, titleImage: base64 }));
-        addLog("大会画像をアップロードしました");
-      };
-      reader.readAsDataURL(file);
-    }
+  const handleTitleImageUpdate = () => {
+    if (!imageUrlInput.trim()) return;
+    const directLink = convertToDirectLink(imageUrlInput);
+    updateState(prev => ({ ...prev, titleImage: directLink }));
+    setImageUrlInput('');
+    addLog("大会画像URLを更新しました");
   };
 
   const clearTitleImage = () => {
@@ -459,13 +451,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">大会ロゴ/画像 (任意)</label>
+                  <label className="text-xs font-bold text-slate-500">大会ロゴ/画像URL (任意)</label>
                   <div className="flex items-center gap-2">
                     {!state.titleImage ? (
-                      <label className="flex items-center justify-center w-full p-2 border-2 border-dashed rounded cursor-pointer hover:bg-slate-50 text-slate-500 text-xs gap-2">
-                          <ImageIcon size={16}/> <span>画像を選択 (Max 1MB)</span>
-                          <input type="file" accept="image/*" className="hidden" onChange={handleTitleImageUpload} />
-                      </label>
+                      <div className="w-full flex gap-2">
+                          <div className="relative flex-1">
+                            <Link className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14}/>
+                            <input 
+                                type="text"
+                                value={imageUrlInput}
+                                onChange={(e) => setImageUrlInput(e.target.value)}
+                                placeholder="Google Drive URL貼り付け"
+                                className="w-full pl-8 pr-2 py-2 border rounded text-xs"
+                            />
+                          </div>
+                          <button 
+                             onClick={handleTitleImageUpdate}
+                             disabled={!imageUrlInput}
+                             className="bg-indigo-600 text-white px-3 py-1 rounded text-xs hover:bg-indigo-700 disabled:opacity-50"
+                          >
+                             Set
+                          </button>
+                      </div>
                     ) : (
                       <div className="flex items-center justify-between w-full p-2 border rounded bg-slate-50">
                           <span className="text-xs text-green-600 font-bold flex items-center gap-1"><ImageIcon size={14}/> 画像セット済み</span>
@@ -473,6 +480,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                     )}
                   </div>
+                  <p className="text-[10px] text-slate-400">Googleドライブの共有リンクに対応しています</p>
                 </div>
 
                 <div className="space-y-1 border-t pt-3">
