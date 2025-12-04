@@ -19,7 +19,8 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
   useEffect(() => {
     let timerId: any;
-    if (state.gameState === GameState.PLAYING_QUESTION && state.questionStartTime) {
+    // Only count down if timer is officially running
+    if (state.gameState === GameState.PLAYING_QUESTION && state.isTimerRunning && state.questionStartTime) {
       timerId = setInterval(() => {
         const elapsedSeconds = (Date.now() - (state.questionStartTime || 0)) / 1000;
         const remaining = Math.max(0, state.timeLimit - elapsedSeconds);
@@ -27,12 +28,18 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
         if (remaining <= 0) clearInterval(timerId);
       }, 100);
     } else {
-      setTimeLeft(0);
+      // If timer is NOT running, show full time or 0 depending on state?
+      // Usually full time is better to show "ready"
+      if (state.gameState === GameState.PLAYING_QUESTION) {
+         setTimeLeft(state.timeLimit);
+      } else {
+         setTimeLeft(0);
+      }
     }
     return () => {
       if (timerId) clearInterval(timerId);
     };
-  }, [state.gameState, state.questionStartTime, state.timeLimit]);
+  }, [state.gameState, state.questionStartTime, state.timeLimit, state.isTimerRunning]);
 
   const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
