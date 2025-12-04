@@ -29,6 +29,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [csvUrl, setCsvUrl] = useState('');
   const [titleInput, setTitleInput] = useState(state.quizTitle || 'クイズ大会');
   const [imageUrlInput, setImageUrlInput] = useState('');
+  const [customTimeLimit, setCustomTimeLimit] = useState(20);
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [debugError, setDebugError] = useState<string | null>(null);
@@ -267,7 +268,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const playThinkingSound = () => {
       if (thinkingSound.url) {
           if (thinkingAudioRef.current) {
-              thinkingAudioRef.current.pause();
+              if (!thinkingAudioRef.current.paused) return; // Already playing
               thinkingAudioRef.current.currentTime = 0;
           } else {
               thinkingAudioRef.current = new Audio(thinkingSound.url);
@@ -326,7 +327,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       gameState: GameState.PLAYING_QUESTION,
       questionStartTime: null, // Timer not started yet
       isTimerRunning: false,
-      timeLimit: 20,
+      timeLimit: customTimeLimit,
       rankingRevealStage: 0,
       isRankingResultVisible: false
     }));
@@ -340,7 +341,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           isTimerRunning: true,
           questionStartTime: Date.now()
       }));
-      playThinkingSound();
+      // playThinkingSound(); // Removed, now handled by effect
       addLog("タイマースタート！");
   };
 
@@ -376,11 +377,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         currentQuestionIndex: nextIndex,
         gameState: GameState.PLAYING_QUESTION,
         questionStartTime: null, // Reset timer
-        isTimerRunning: false
+        isTimerRunning: false,
+        timeLimit: customTimeLimit
       };
     });
     playIntroSound();
   };
+
+  // Monitor timer to trigger thinking sound at 10 seconds remaining
+  useEffect(() => {
+    let interval: any;
+    if (state.gameState === GameState.PLAYING_QUESTION && state.isTimerRunning && state.questionStartTime) {
+        interval = setInterval(() => {
+            const elapsed = (Date.now() - (state.questionStartTime || 0)) / 1000;
+            const remaining = state.timeLimit - elapsed;
+            
+            // If remaining is 10.5s or less (and valid), start sound if not playing
+            // Using 10.5 to ensure it catches around the 10s mark cleanly
+            if (remaining <= 10.5 && remaining > -1) {
+                 if (thinkingAudioRef.current && thinkingAudioRef.current.paused && thinkingSound.url) {
+                      playThinkingSound();
+                 } else if (!thinkingAudioRef.current && thinkingSound.url) {
+                      playThinkingSound();
+                 }
+            }
+        }, 200);
+    } else {
+        // Stop sound if timer stops or state changes (handled by stopThinkingSound in actions usually, but safety check)
+    }
+    return () => clearInterval(interval);
+  }, [state.gameState, state.isTimerRunning, state.questionStartTime, state.timeLimit, thinkingSound.url]);
 
   const goToStage = (stage: number) => {
       updateState(prev => ({ 
@@ -619,6 +645,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 {state.gameState === GameState.LOBBY && (
                   <div className="space-y-2">
+                     <div className="flex items-center gap-2 mb-2 bg-slate-50 p-2 rounded">
+                        <Clock size={16} className="text-slate-500"/>
+                        <span className="text-xs font-bold text-slate-500">制限時間(秒):</span>
+                        <input 
+                            type="number" 
+                            min="5" 
+                            max="300" 
+                            value={customTimeLimit} 
+                            onChange={(e) => setCustomTimeLimit(Number(e.target.value))}
+                            className="w-20 border rounded px-2 py-1 text-sm font-bold"
+                        />
+                     </div>
                      <button onClick={startGame} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700">
                         クイズ開始 (問題表示)
                      </button>
@@ -628,9 +666,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {state.gameState === GameState.PLAYING_QUESTION && (
                   <div className="space-y-3">
                       {!state.isTimerRunning ? (
-                          <button onClick={startTimer} className="w-full bg-orange-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-orange-700 flex items-center justify-center gap-2 animate-pulse">
-                             <Timer size={24}/> タイマースタート！
-                          </button>
+                          <>
+                            <div className="flex items-center gap-2 mb-2 bg-slate-50 p-2 rounded">
+                                <Clock size={16} className="text-slate-500"/>
+                                <span className="text-xs font-bold text-slate-500">制限時間(秒):</span>
+                                <input 
+                                    type="number" 
+                                    min="5" 
+                                    max="300" 
+                                    value={customTimeLimit} 
+                                    onChange={(e) => setCustomTimeLimit(Number(e.target.value))}
+                                    className="w-20 border rounded px-2 py-1 text-sm font-bold"
+                                />
+                            </div>
+                            <button onClick={startTimer} className="w-full bg-orange-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-orange-700 flex items-center justify-center gap-2 animate-pulse">
+                                <Timer size={24}/> タイマースタート！
+                            </button>
+                          </>
                       ) : (
                           <div className="w-full bg-slate-100 text-slate-500 py-2 rounded-lg text-center text-sm font-bold border border-slate-200">
                               シンキングタイム中...
@@ -691,6 +743,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                            </label>
                            {thinkingSound.url && <button onClick={() => { if(thinkingAudioRef.current) { thinkingAudioRef.current.currentTime=0; thinkingAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>}
                        </div>
+                       <p className="text-[10px] text-slate-400">※残り10秒から自動再生されます</p>
                    </div>
                </div>
 
