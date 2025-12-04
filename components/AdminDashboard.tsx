@@ -146,7 +146,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleFileSelect = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (audioRefs.current && audioRefs.current[index]) {
+      // Ensure audioRefs is initialized
+      if (!audioRefs.current) {
+         audioRefs.current = new Array(6).fill(null);
+      }
+
+      // Cleanup old audio if exists
+      if (audioRefs.current[index]) {
         const oldAudio = audioRefs.current[index];
         if (oldAudio) {
             oldAudio.pause();
@@ -156,6 +162,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         }
         audioRefs.current[index] = null;
       }
+      
       const oldSlot = soundSlots[index];
       if (oldSlot.url) URL.revokeObjectURL(oldSlot.url);
       
@@ -170,6 +177,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const slot = soundSlots[index];
         if (!slot.url) return;
         
+        // Safety check for audioRefs
         if (!audioRefs.current) audioRefs.current = new Array(6).fill(null);
         let audio = audioRefs.current[index];
 
@@ -179,11 +187,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         }
         audio.volume = slot.volume;
         audio.loop = slot.isLoop;
+        
+        // Ensure cleanup of event listeners to avoid duplicates or memory leaks
         audio.onended = null;
         audio.onerror = null;
 
         audio.onended = () => {
-             if (audio.loop) return;
+             if (audio && audio.loop) return;
              setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
         };
         audio.onerror = (e) => {
@@ -193,18 +203,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         };
 
         if (slot.isPlaying) {
+            // Stop logic
+            audio.pause();
             audio.currentTime = 0;
-            audio.play().catch(e => {
-                 console.error("Replay error", e);
-                 setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-            });
+            setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
         } else {
+            // Play logic
             audio.currentTime = 0; 
-            audio.play().catch(e => {
-                console.error("Play error", e);
-                setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-            });
-            setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
+                }).catch(e => {
+                    console.error("Play error", e);
+                    setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
+                });
+            }
         }
     } catch (e: any) {
         addLog(`Sound Logic Error: ${e.message}`);
