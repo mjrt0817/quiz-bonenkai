@@ -54,6 +54,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // --- Auto Sounds (Intro & Thinking) ---
   const [introSound, setIntroSound] = useState<{file: File|null, url: string|null}>({ file: null, url: null });
   const [thinkingSound, setThinkingSound] = useState<{file: File|null, url: string|null}>({ file: null, url: null });
+  const [isThinkingLoop, setIsThinkingLoop] = useState(true); // Default loop ON for thinking music
 
   const audioRefs = useRef<(HTMLAudioElement | null)[]>(new Array(6).fill(null));
   const introAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -252,6 +253,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
   };
 
+  const toggleThinkingLoop = () => {
+      const newLoop = !isThinkingLoop;
+      setIsThinkingLoop(newLoop);
+      if (thinkingAudioRef.current) {
+          thinkingAudioRef.current.loop = newLoop;
+      }
+  };
+
   const playIntroSound = () => {
       if (introSound.url) {
           if (introAudioRef.current) {
@@ -272,8 +281,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               thinkingAudioRef.current.currentTime = 0;
           } else {
               thinkingAudioRef.current = new Audio(thinkingSound.url);
-              thinkingAudioRef.current.loop = true;
           }
+          thinkingAudioRef.current.loop = isThinkingLoop; // Apply current loop setting
           thinkingAudioRef.current.src = thinkingSound.url;
           thinkingAudioRef.current.play().catch(e => console.error("Thinking play fail", e));
       }
@@ -406,7 +415,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         // Stop sound if timer stops or state changes (handled by stopThinkingSound in actions usually, but safety check)
     }
     return () => clearInterval(interval);
-  }, [state.gameState, state.isTimerRunning, state.questionStartTime, state.timeLimit, thinkingSound.url]);
+  }, [state.gameState, state.isTimerRunning, state.questionStartTime, state.timeLimit, thinkingSound.url, isThinkingLoop]);
 
   const goToStage = (stage: number) => {
       updateState(prev => ({ 
@@ -741,7 +750,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                {thinkingSound.file ? thinkingSound.file.name : "ファイル選択..."}
                                <input type="file" accept="audio/*" className="hidden" onChange={handleThinkingSoundSelect} />
                            </label>
-                           {thinkingSound.url && <button onClick={() => { if(thinkingAudioRef.current) { thinkingAudioRef.current.currentTime=0; thinkingAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>}
+                           {thinkingSound.url && (
+                               <div className="flex gap-1">
+                                    <button onClick={() => toggleThinkingLoop()} className={`p-1 rounded ${isThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-300 text-slate-500'}`} title="Loop ON/OFF">
+                                        <Repeat size={12}/>
+                                    </button>
+                                    <button onClick={() => { if(thinkingAudioRef.current) { thinkingAudioRef.current.currentTime=0; thinkingAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>
+                               </div>
+                           )}
                        </div>
                        <p className="text-[10px] text-slate-400">※残り10秒から自動再生されます</p>
                    </div>
