@@ -277,7 +277,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           if (mainThinkingSound.url) URL.revokeObjectURL(mainThinkingSound.url);
           const url = URL.createObjectURL(file);
           setMainThinkingSound({ file, url });
-          addLog("メインBGM(〜残り10秒)をセットしました");
+          addLog("メインBGM(〜残り6秒)をセットしました");
       }
   };
 
@@ -287,7 +287,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           if (thinkingSound.url) URL.revokeObjectURL(thinkingSound.url);
           const url = URL.createObjectURL(file);
           setThinkingSound({ file, url });
-          addLog("残り10秒のBGMをセットしました");
+          addLog("カウントダウンBGM(残り6秒〜)をセットしました");
       }
   };
 
@@ -479,7 +479,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }));
   };
 
-  // Monitor timer to trigger thinking sound at 10 seconds remaining
+  // Monitor timer to trigger thinking sound at 6 seconds remaining
   useEffect(() => {
     let interval: any;
     if (state.gameState === GameState.PLAYING_QUESTION && state.isTimerRunning && state.questionStartTime) {
@@ -487,9 +487,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             const elapsed = (Date.now() - (state.questionStartTime || 0)) / 1000;
             const remaining = state.timeLimit - elapsed;
             
-            // If remaining is 10.5s or less (and valid), start sound if not playing
-            // Using 10.5 to ensure it catches around the 10s mark cleanly
-            if (remaining <= 10.5 && remaining > -1) {
+            // If remaining is 6.5s or less (and valid), switch BGM
+            if (remaining <= 6.5 && remaining > -1) {
                  // Ensure main BGM is stopped first
                  if (mainThinkingAudioRef.current && !mainThinkingAudioRef.current.paused) {
                      mainThinkingAudioRef.current.pause();
@@ -850,19 +849,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </div>
                         </div>
                         <div className="flex-1 space-y-2">
-                            <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> メインBGM (〜残り10秒)</label>
+                            <div className="flex justify-between items-center">
+                                <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> メインBGM (〜残り6秒)</label>
+                                <div className="flex gap-2 items-center">
+                                    <button onClick={() => toggleMainThinkingLoop()} className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 ${isMainThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`} title="Loop ON/OFF">
+                                        <Repeat size={10}/> Loop: {isMainThinkingLoop ? 'ON' : 'OFF'}
+                                    </button>
+                                </div>
+                            </div>
                             <div className="flex gap-2 items-center">
                                 <label className="flex-1 border rounded bg-white px-2 py-1 text-xs cursor-pointer hover:bg-slate-50 truncate">
                                     {mainThinkingSound.file ? mainThinkingSound.file.name : "ファイル選択..."}
                                     <input type="file" accept="audio/*" className="hidden" onChange={handleMainThinkingSoundSelect} />
                                 </label>
                                 {mainThinkingSound.url && (
-                                     <div className="flex gap-1">
-                                        <button onClick={() => toggleMainThinkingLoop()} className={`p-1 rounded ${isMainThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-300 text-slate-500'}`} title="Loop ON/OFF">
-                                            <Repeat size={12}/>
-                                        </button>
-                                        <button onClick={() => { if(mainThinkingAudioRef.current) { mainThinkingAudioRef.current.currentTime=0; mainThinkingAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>
-                                     </div>
+                                     <button onClick={() => { if(mainThinkingAudioRef.current) { mainThinkingAudioRef.current.currentTime=0; mainThinkingAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>
                                 )}
                             </div>
                         </div>
@@ -870,13 +871,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                    
                    <div className="flex-1 space-y-2 border-t pt-2">
                        <div className="flex justify-between items-center">
-                            <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> カウントダウンBGM (残り10秒〜)</label>
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> カウントダウンBGM (残り6秒〜)</label>
                             <div className="flex gap-2 items-center">
-                                {thinkingSound.url && (
-                                    <button onClick={() => toggleThinkingLoop()} className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 ${isThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`} title="Loop ON/OFF">
-                                        <Repeat size={10}/> Loop: {isThinkingLoop ? 'ON' : 'OFF'}
-                                    </button>
-                                )}
+                                <button onClick={() => toggleThinkingLoop()} className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 ${isThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`} title="Loop ON/OFF">
+                                    <Repeat size={10}/> Loop: {isThinkingLoop ? 'ON' : 'OFF'}
+                                </button>
                             </div>
                        </div>
                        <div className="flex gap-2 items-center">
