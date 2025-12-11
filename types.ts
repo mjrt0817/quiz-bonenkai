@@ -24,6 +24,7 @@ export interface Player {
   lastAnswerTime: number; // For tie-breaking
   totalResponseTime?: number; // Total milliseconds taken to answer across all questions
   isOnline?: boolean; // Track connection status roughly
+  isOrganizer?: boolean; // Flag for host/organizer team (always ranked last)
 }
 
 export interface HostState {
