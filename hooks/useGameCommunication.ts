@@ -176,6 +176,13 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     if (role !== 'HOST' && role !== 'ADMIN') return;
     await db.ref(`rooms/${ROOM_ID}/players`).remove();
   }, [role]);
+  
+  const toggleOrganizer = useCallback(async (targetPlayerId: string, currentState: boolean) => {
+      if (role !== 'HOST' && role !== 'ADMIN') return;
+      await db.ref(`rooms/${ROOM_ID}/players/${targetPlayerId}`).update({
+          isOrganizer: !currentState
+      });
+  }, [role]);
 
 
   // --- PLAYER ACTIONS ---
@@ -217,7 +224,8 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
         lastAnswerIndex: null,
         lastAnswerTime: 0,
         totalResponseTime: 0,
-        isOnline: true
+        isOnline: true,
+        isOrganizer: false
       };
       const playerRef = db.ref(`rooms/${ROOM_ID}/players/${targetId}`);
       await playerRef.set(player);
@@ -248,6 +256,7 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     resetPlayerScores,
     calculateAndSaveScores,
     kickPlayer,
-    resetAllPlayers
+    resetAllPlayers,
+    toggleOrganizer
   };
 };
