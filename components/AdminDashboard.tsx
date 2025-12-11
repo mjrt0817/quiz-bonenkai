@@ -52,13 +52,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }))
   );
   
-  // --- Auto Sounds (Intro & Thinking) ---
+  // --- Auto Sounds (Intro, Main Thinking, Countdown Thinking) ---
   const [introSound, setIntroSound] = useState<{file: File|null, url: string|null}>({ file: null, url: null });
+  const [mainThinkingSound, setMainThinkingSound] = useState<{file: File|null, url: string|null}>({ file: null, url: null });
   const [thinkingSound, setThinkingSound] = useState<{file: File|null, url: string|null}>({ file: null, url: null });
-  const [isThinkingLoop, setIsThinkingLoop] = useState(true); // Default loop ON for thinking music
+  
+  const [isMainThinkingLoop, setIsMainThinkingLoop] = useState(true);
+  const [isThinkingLoop, setIsThinkingLoop] = useState(false); // Countdown usually doesn't loop
 
   const audioRefs = useRef<(HTMLAudioElement | null)[]>(new Array(6).fill(null));
   const introAudioRef = useRef<HTMLAudioElement | null>(null);
+  const mainThinkingAudioRef = useRef<HTMLAudioElement | null>(null);
   const thinkingAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Cleanup on unmount
@@ -68,6 +72,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (slot.url) URL.revokeObjectURL(slot.url);
       });
       if (introSound.url) URL.revokeObjectURL(introSound.url);
+      if (mainThinkingSound.url) URL.revokeObjectURL(mainThinkingSound.url);
       if (thinkingSound.url) URL.revokeObjectURL(thinkingSound.url);
 
       if (audioRefs.current) {
@@ -83,6 +88,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (introAudioRef.current) {
           introAudioRef.current.pause();
           introAudioRef.current.src = '';
+      }
+      if (mainThinkingAudioRef.current) {
+          mainThinkingAudioRef.current.pause();
+          mainThinkingAudioRef.current.src = '';
       }
       if (thinkingAudioRef.current) {
           thinkingAudioRef.current.pause();
@@ -262,13 +271,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
   };
 
+  const handleMainThinkingSoundSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          if (mainThinkingSound.url) URL.revokeObjectURL(mainThinkingSound.url);
+          const url = URL.createObjectURL(file);
+          setMainThinkingSound({ file, url });
+          addLog("メインBGM(〜残り10秒)をセットしました");
+      }
+  };
+
   const handleThinkingSoundSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
           if (thinkingSound.url) URL.revokeObjectURL(thinkingSound.url);
           const url = URL.createObjectURL(file);
           setThinkingSound({ file, url });
-          addLog("シンキングタイムのBGMをセットしました");
+          addLog("残り10秒のBGMをセットしました");
+      }
+  };
+
+  const toggleMainThinkingLoop = () => {
+      const newLoop = !isMainThinkingLoop;
+      setIsMainThinkingLoop(newLoop);
+      if (mainThinkingAudioRef.current) {
+          mainThinkingAudioRef.current.loop = newLoop;
       }
   };
 
@@ -293,8 +320,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
   };
 
+  const playMainThinkingSound = () => {
+      if (mainThinkingSound.url) {
+          if (mainThinkingAudioRef.current) {
+               if (!mainThinkingAudioRef.current.paused) return;
+               mainThinkingAudioRef.current.currentTime = 0;
+          } else {
+               mainThinkingAudioRef.current = new Audio(mainThinkingSound.url);
+          }
+          mainThinkingAudioRef.current.loop = isMainThinkingLoop;
+          mainThinkingAudioRef.current.src = mainThinkingSound.url;
+          mainThinkingAudioRef.current.play().catch(e => console.error("Main Thinking play fail", e));
+      }
+  };
+
   const playThinkingSound = () => {
       if (thinkingSound.url) {
+          // Ensure main BGM is stopped
+          if (mainThinkingAudioRef.current) {
+              mainThinkingAudioRef.current.pause();
+              mainThinkingAudioRef.current.currentTime = 0;
+          }
+
           if (thinkingAudioRef.current) {
               if (!thinkingAudioRef.current.paused) return; // Already playing
               thinkingAudioRef.current.currentTime = 0;
@@ -308,6 +355,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const stopThinkingSound = () => {
+      if (mainThinkingAudioRef.current) {
+          mainThinkingAudioRef.current.pause();
+          mainThinkingAudioRef.current.currentTime = 0;
+      }
       if (thinkingAudioRef.current) {
           thinkingAudioRef.current.pause();
           thinkingAudioRef.current.currentTime = 0;
@@ -369,8 +420,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           isTimerRunning: true,
           questionStartTime: Date.now()
       }));
-      // playThinkingSound(); // Removed, now handled by effect
-      addLog("タイマースタート！");
+      playMainThinkingSound();
+      addLog("タイマースタート！(メインBGM開始)");
   };
 
   const showResults = async () => {
@@ -439,6 +490,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             // If remaining is 10.5s or less (and valid), start sound if not playing
             // Using 10.5 to ensure it catches around the 10s mark cleanly
             if (remaining <= 10.5 && remaining > -1) {
+                 // Ensure main BGM is stopped first
+                 if (mainThinkingAudioRef.current && !mainThinkingAudioRef.current.paused) {
+                     mainThinkingAudioRef.current.pause();
+                 }
+
                  if (thinkingAudioRef.current && thinkingAudioRef.current.paused && thinkingSound.url) {
                       playThinkingSound();
                  } else if (!thinkingAudioRef.current && thinkingSound.url) {
@@ -450,7 +506,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         // Stop sound if timer stops or state changes (handled by stopThinkingSound in actions usually, but safety check)
     }
     return () => clearInterval(interval);
-  }, [state.gameState, state.isTimerRunning, state.questionStartTime, state.timeLimit, thinkingSound.url, isThinkingLoop]);
+  }, [state.gameState, state.isTimerRunning, state.questionStartTime, state.timeLimit, thinkingSound.url, isThinkingLoop, mainThinkingSound.url]);
 
   const goToStage = (stage: number) => {
       updateState(prev => ({ 
@@ -781,34 +837,55 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                </div>
                
                {/* Auto Play Settings */}
-               <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-4">
-                   <div className="flex-1 space-y-2">
-                       <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Monitor size={12}/> 問題表示時の効果音</label>
-                       <div className="flex gap-2 items-center">
-                           <label className="flex-1 border rounded bg-white px-2 py-1 text-xs cursor-pointer hover:bg-slate-50 truncate">
-                               {introSound.file ? introSound.file.name : "ファイル選択..."}
-                               <input type="file" accept="audio/*" className="hidden" onChange={handleIntroSoundSelect} />
-                           </label>
-                           {introSound.url && <button onClick={() => { if(introAudioRef.current) { introAudioRef.current.currentTime=0; introAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>}
-                       </div>
+               <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col gap-4">
+                   <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex-1 space-y-2">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Monitor size={12}/> 問題表示時の効果音</label>
+                            <div className="flex gap-2 items-center">
+                                <label className="flex-1 border rounded bg-white px-2 py-1 text-xs cursor-pointer hover:bg-slate-50 truncate">
+                                    {introSound.file ? introSound.file.name : "ファイル選択..."}
+                                    <input type="file" accept="audio/*" className="hidden" onChange={handleIntroSoundSelect} />
+                                </label>
+                                {introSound.url && <button onClick={() => { if(introAudioRef.current) { introAudioRef.current.currentTime=0; introAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>}
+                            </div>
+                        </div>
+                        <div className="flex-1 space-y-2">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> メインBGM (〜残り10秒)</label>
+                            <div className="flex gap-2 items-center">
+                                <label className="flex-1 border rounded bg-white px-2 py-1 text-xs cursor-pointer hover:bg-slate-50 truncate">
+                                    {mainThinkingSound.file ? mainThinkingSound.file.name : "ファイル選択..."}
+                                    <input type="file" accept="audio/*" className="hidden" onChange={handleMainThinkingSoundSelect} />
+                                </label>
+                                {mainThinkingSound.url && (
+                                     <div className="flex gap-1">
+                                        <button onClick={() => toggleMainThinkingLoop()} className={`p-1 rounded ${isMainThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-300 text-slate-500'}`} title="Loop ON/OFF">
+                                            <Repeat size={12}/>
+                                        </button>
+                                        <button onClick={() => { if(mainThinkingAudioRef.current) { mainThinkingAudioRef.current.currentTime=0; mainThinkingAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>
+                                     </div>
+                                )}
+                            </div>
+                        </div>
                    </div>
-                   <div className="flex-1 space-y-2">
-                       <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> シンキングタイムBGM (Loop)</label>
+                   
+                   <div className="flex-1 space-y-2 border-t pt-2">
+                       <div className="flex justify-between items-center">
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> カウントダウンBGM (残り10秒〜)</label>
+                            <div className="flex gap-2 items-center">
+                                {thinkingSound.url && (
+                                    <button onClick={() => toggleThinkingLoop()} className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 ${isThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`} title="Loop ON/OFF">
+                                        <Repeat size={10}/> Loop: {isThinkingLoop ? 'ON' : 'OFF'}
+                                    </button>
+                                )}
+                            </div>
+                       </div>
                        <div className="flex gap-2 items-center">
                            <label className="flex-1 border rounded bg-white px-2 py-1 text-xs cursor-pointer hover:bg-slate-50 truncate">
                                {thinkingSound.file ? thinkingSound.file.name : "ファイル選択..."}
                                <input type="file" accept="audio/*" className="hidden" onChange={handleThinkingSoundSelect} />
                            </label>
-                           {thinkingSound.url && (
-                               <div className="flex gap-1">
-                                    <button onClick={() => toggleThinkingLoop()} className={`p-1 rounded ${isThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-300 text-slate-500'}`} title="Loop ON/OFF">
-                                        <Repeat size={12}/>
-                                    </button>
-                                    <button onClick={() => { if(thinkingAudioRef.current) { thinkingAudioRef.current.currentTime=0; thinkingAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>
-                               </div>
-                           )}
+                           {thinkingSound.url && <button onClick={() => { if(thinkingAudioRef.current) { thinkingAudioRef.current.currentTime=0; thinkingAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>}
                        </div>
-                       <p className="text-[10px] text-slate-400">※残り10秒から自動再生されます</p>
                    </div>
                </div>
 
