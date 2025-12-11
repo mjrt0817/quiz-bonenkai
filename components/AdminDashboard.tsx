@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz, convertToDirectLink } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal, Monitor, Link, Timer } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal, Monitor, Link, Timer, Crown } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -11,6 +11,7 @@ interface AdminDashboardProps {
   calculateAndSaveScores: () => Promise<void>;
   kickPlayer: (id: string) => Promise<void>;
   resetAllPlayers: () => Promise<void>;
+  toggleOrganizer: (id: string, current: boolean) => Promise<void>;
   onBack: () => void;
 }
 
@@ -24,7 +25,7 @@ interface SoundSlot {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  state, updateState, resetPlayerAnswers, resetPlayerScores, calculateAndSaveScores, kickPlayer, resetAllPlayers, onBack 
+  state, updateState, resetPlayerAnswers, resetPlayerScores, calculateAndSaveScores, kickPlayer, resetAllPlayers, toggleOrganizer, onBack 
 }) => {
   const [csvUrl, setCsvUrl] = useState('');
   const [titleInput, setTitleInput] = useState(state.quizTitle || 'クイズ大会');
@@ -100,6 +101,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const validPlayers = players.filter(p => p && typeof p === 'object' && p.id);
         
         return [...validPlayers].sort((a, b) => {
+            // Organizer sort: Organizers go to the bottom
+            if (a.isOrganizer && !b.isOrganizer) return 1;
+            if (!a.isOrganizer && b.isOrganizer) return -1;
+
             const scoreA = typeof a.score === 'number' ? a.score : 0;
             const scoreB = typeof b.score === 'number' ? b.score : 0;
             if (scoreB !== scoreA) return scoreB - scoreA;
@@ -878,12 +883,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     const totalSec = ((player.totalResponseTime || 0) / 1000).toFixed(1);
 
                                     return (
-                                    <tr key={player.id} className="hover:bg-slate-50 group">
+                                    <tr key={player.id} className={`hover:bg-slate-50 group ${player.isOrganizer ? 'bg-gray-100 text-gray-500' : ''}`}>
                                         <td className="p-3 font-bold text-slate-800">
                                         <div className="flex items-center gap-2">
                                             <span className="w-5 text-slate-400 text-xs">{index + 1}</span>
                                             <div className={`w-2 h-2 rounded-full ${player.isOnline !== false ? 'bg-green-500' : 'bg-gray-300'}`}></div>
                                             {player.name || 'No Name'}
+                                            {player.isOrganizer && <Crown size={14} className="text-yellow-500" />}
                                         </div>
                                         </td>
                                         <td className="p-3 font-mono font-bold text-indigo-600">{player.score || 0}</td>
@@ -906,15 +912,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         )}
                                         </td>
                                         <td className="p-3 text-right">
-                                        <button 
-                                            onClick={() => {
-                                            if(confirm(`${player.name}を退場させますか？`)) kickPlayer(player.id);
-                                            }}
-                                            className="p-1 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition"
-                                            title="キック"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition">
+                                            <button
+                                                onClick={() => toggleOrganizer(player.id, !!player.isOrganizer)}
+                                                className={`p-1 ${player.isOrganizer ? 'text-yellow-500' : 'text-slate-300 hover:text-yellow-500'}`}
+                                                title={player.isOrganizer ? "主催者権限を外す" : "主催者としてマーク (最下位)"}
+                                            >
+                                                <Crown size={16} />
+                                            </button>
+                                            <button 
+                                                onClick={() => {
+                                                if(confirm(`${player.name}を退場させますか？`)) kickPlayer(player.id);
+                                                }}
+                                                className="p-1 text-slate-400 hover:text-red-600"
+                                                title="キック"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                         </td>
                                     </tr>
                                     );
