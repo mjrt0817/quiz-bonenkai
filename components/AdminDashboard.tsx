@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz, convertToDirectLink } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal, Monitor, Link, Timer, Crown } from 'lucide-react';
+import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal, Monitor, Link, Timer, Crown, FastForward } from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -411,6 +411,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     });
     playIntroSound();
   };
+  
+  const forceFinishGame = () => {
+      if (!confirm("本当にクイズを終了して、最終結果発表に移りますか？\n（残りの問題はスキップされます）")) return;
+
+      stopThinkingSound();
+      addLog("管理者操作によりクイズを強制終了しました");
+
+      updateState(prev => ({
+        ...prev,
+        gameState: GameState.FINAL_RESULT,
+        rankingRevealStage: 0,
+        isRankingResultVisible: false,
+        questionStartTime: null,
+        isTimerRunning: false
+      }));
+  };
 
   // Monitor timer to trigger thinking sound at 10 seconds remaining
   useEffect(() => {
@@ -532,6 +548,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
       return null;
   };
+
+  const isGameRunning = state.gameState === GameState.PLAYING_QUESTION || state.gameState === GameState.PLAYING_RESULT;
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans pb-20">
@@ -736,6 +754,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                     {renderRankingControl()}
                   </div>
+                )}
+
+                {/* Force Finish Button */}
+                {isGameRunning && (
+                    <div className="border-t border-slate-200 pt-4 mt-4">
+                         <button 
+                            onClick={forceFinishGame}
+                            className="w-full bg-slate-100 text-red-600 hover:bg-red-50 border border-red-200 py-2 rounded text-xs font-bold flex items-center justify-center gap-1"
+                         >
+                            <FastForward size={14} /> ⚠️ 残りの問題をスキップして結果発表へ
+                         </button>
+                    </div>
                 )}
               </div>
             </div>
