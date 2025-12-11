@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
-import { Users, CheckCircle, Sparkles, Monitor, Medal, Trophy, AlertTriangle, Image as ImageIcon } from 'lucide-react';
+import { Users, CheckCircle, Sparkles, Monitor, Medal, Trophy, AlertTriangle, Image as ImageIcon, Crown } from 'lucide-react';
 
 interface HostScreenProps {
   state: HostState;
@@ -44,6 +44,10 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
   const sortedPlayers = [...state.players].sort((a, b) => {
+      // Organizer sort: Organizers go to the bottom
+      if (a.isOrganizer && !b.isOrganizer) return 1;
+      if (!a.isOrganizer && b.isOrganizer) return -1;
+
       if (b.score !== a.score) return b.score - a.score;
       return (a.totalResponseTime || 0) - (b.totalResponseTime || 0);
   });
@@ -194,9 +198,10 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                         <div className="flex-1 overflow-y-auto p-4">
                             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
                                 {sortedPlayers.map((player) => (
-                                    <div key={player.id} className="bg-slate-700/50 p-2 rounded-lg flex items-center gap-2 animate-in fade-in zoom-in duration-300">
+                                    <div key={player.id} className={`bg-slate-700/50 p-2 rounded-lg flex items-center gap-2 animate-in fade-in zoom-in duration-300 ${player.isOrganizer ? 'border border-yellow-600/50' : ''}`}>
                                         <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></div>
-                                        <span className="font-bold text-sm truncate">{player.name}</span>
+                                        <span className={`font-bold text-sm truncate ${player.isOrganizer ? 'text-yellow-500' : ''}`}>{player.name}</span>
+                                        {player.isOrganizer && <Crown size={12} className="text-yellow-500 ml-auto" />}
                                     </div>
                                 ))}
                             </div>
