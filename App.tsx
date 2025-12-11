@@ -125,7 +125,7 @@ const AdminApp: React.FC<{onBack: () => void}> = ({ onBack }) => {
   const { 
     hostState, updateHostState, resetPlayerAnswers, 
     resetPlayerScores, calculateAndSaveScores, 
-    kickPlayer, resetAllPlayers 
+    kickPlayer, resetAllPlayers, toggleOrganizer
   } = useGameCommunication('ADMIN');
   
   return (
@@ -137,6 +137,7 @@ const AdminApp: React.FC<{onBack: () => void}> = ({ onBack }) => {
       calculateAndSaveScores={calculateAndSaveScores}
       kickPlayer={kickPlayer}
       resetAllPlayers={resetAllPlayers}
+      toggleOrganizer={toggleOrganizer}
       onBack={onBack}
     />
   );
