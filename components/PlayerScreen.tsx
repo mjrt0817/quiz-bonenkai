@@ -136,6 +136,11 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
          <div className="mt-8 px-6 py-2 bg-white/20 rounded-full font-mono text-xl font-bold">
            {currentPlayer?.name}
          </div>
+         {currentPlayer?.isOrganizer && (
+             <div className="mt-4 text-yellow-300 font-bold text-sm bg-yellow-900/30 px-3 py-1 rounded">
+                 ※ あなたは主催者モードです（ランキング対象外）
+             </div>
+         )}
       </div>
     );
   }
@@ -275,6 +280,10 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
   // --- 5. FINAL RESULT ---
   if (state.gameState === GameState.FINAL_RESULT) {
      const sortedPlayers = [...state.players].sort((a, b) => {
+         // Sort logic same as Host: Organizers last
+         if (a.isOrganizer && !b.isOrganizer) return 1;
+         if (!a.isOrganizer && b.isOrganizer) return -1;
+
          if (b.score !== a.score) return b.score - a.score;
          const timeA = a.totalResponseTime || 0;
          const timeB = b.totalResponseTime || 0;
@@ -283,16 +292,22 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
      
      const myRankIndex = sortedPlayers.findIndex(p => p.id === playerId);
      const myRank = myRankIndex + 1;
+     const isOrganizer = currentPlayer?.isOrganizer;
      
+     // Determine if I should see the result
      let showMyResult = false;
-     if (myRank > 3) {
-         showMyResult = true;
-     } else if (myRank === 3 && state.rankingRevealStage >= 1) {
-         showMyResult = true;
-     } else if (myRank === 2 && state.rankingRevealStage >= 2) {
-         showMyResult = true;
-     } else if (myRank === 1 && state.rankingRevealStage >= 3) {
-         showMyResult = true;
+     if (isOrganizer) {
+         showMyResult = true; // Organizers see their result (last place) immediately
+     } else {
+        if (myRank > 3) {
+            showMyResult = true;
+        } else if (myRank === 3 && state.rankingRevealStage >= 1) {
+            showMyResult = true;
+        } else if (myRank === 2 && state.rankingRevealStage >= 2) {
+            showMyResult = true;
+        } else if (myRank === 1 && state.rankingRevealStage >= 3) {
+            showMyResult = true;
+        }
      }
 
      if (state.hideBelowTop3 && myRank > 3) {
@@ -305,6 +320,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
                      <h2 className="text-3xl font-black mb-4 text-white">THANK YOU!</h2>
                      <p className="text-lg text-indigo-200 mb-8">ご参加ありがとうございました！<br/>クイズ大会は終了です。</p>
                      <div className="text-3xl font-mono font-bold text-indigo-400 mb-2">{currentPlayer?.score} pts</div>
+                     {isOrganizer && <p className="text-yellow-500 text-sm mt-2">(主催者枠)</p>}
                      <button onClick={onBack} className="mt-8 flex items-center gap-2 text-slate-500 hover:text-white transition">
                         <LogOut size={16} /> Exit
                     </button>
@@ -338,13 +354,13 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
 
      return (
          <div className="h-full bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center relative overflow-hidden">
-             {myRank === 1 && <div className="absolute inset-0 bg-gradient-to-b from-yellow-600/20 to-slate-900 animate-pulse"></div>}
+             {myRank === 1 && !isOrganizer && <div className="absolute inset-0 bg-gradient-to-b from-yellow-600/20 to-slate-900 animate-pulse"></div>}
              <div className="z-10 flex flex-col items-center">
-                {myRank === 1 ? (
+                {myRank === 1 && !isOrganizer ? (
                     <Trophy size={80} className="text-yellow-400 mb-4 drop-shadow-[0_0_15px_rgba(250,204,21,0.5)] animate-bounce-short" />
-                ) : myRank === 2 ? (
+                ) : myRank === 2 && !isOrganizer ? (
                     <Medal size={80} className="text-slate-300 mb-4" />
-                ) : myRank === 3 ? (
+                ) : myRank === 3 && !isOrganizer ? (
                     <Medal size={80} className="text-amber-600 mb-4" />
                 ) : (
                     <div className="text-6xl font-black text-slate-600 mb-4">#{myRank}</div>
@@ -352,7 +368,8 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
                 <h2 className="text-2xl font-bold text-slate-400 uppercase tracking-widest mb-2">Final Ranking</h2>
                 <div className="text-6xl font-black mb-2">{myRank}<span className="text-2xl align-top ml-1">位</span></div>
                 <div className="text-3xl font-mono font-bold text-indigo-400 mb-8">{currentPlayer?.score} pts</div>
-                <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-white transition">
+                {isOrganizer && <p className="text-yellow-500 font-bold border border-yellow-500/50 bg-yellow-900/20 px-4 py-2 rounded-lg">主催者参加</p>}
+                <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-white transition mt-4">
                     <LogOut size={16} /> Exit
                 </button>
              </div>
