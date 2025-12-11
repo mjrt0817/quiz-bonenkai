@@ -64,6 +64,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const introAudioRef = useRef<HTMLAudioElement | null>(null);
   const mainThinkingAudioRef = useRef<HTMLAudioElement | null>(null);
   const thinkingAudioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Flag to ensure countdown sound triggers only once per question
+  const hasTriggeredCountdownRef = useRef(false);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -343,7 +346,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           }
 
           if (thinkingAudioRef.current) {
-              if (!thinkingAudioRef.current.paused) return; // Already playing
+              // If already playing, don't restart unless specifically needed, 
+              // but here we want to prevent double-triggering logic in useEffect
+              if (!thinkingAudioRef.current.paused) return; 
               thinkingAudioRef.current.currentTime = 0;
           } else {
               thinkingAudioRef.current = new Audio(thinkingSound.url);
@@ -400,6 +405,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const startGame = () => {
     resetPlayerScores();
+    hasTriggeredCountdownRef.current = false; // Reset BGM trigger
     updateState(prev => ({
       ...prev,
       currentQuestionIndex: 0,
@@ -415,6 +421,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const startTimer = () => {
+      hasTriggeredCountdownRef.current = false; // Reset BGM trigger for this question
       updateState(prev => ({
           ...prev,
           isTimerRunning: true,
@@ -439,6 +446,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const nextQuestion = () => {
     resetPlayerAnswers();
+    hasTriggeredCountdownRef.current = false; // Reset BGM trigger
     updateState(prev => {
       const nextIndex = prev.currentQuestionIndex + 1;
       if (nextIndex >= prev.questions.length) {
@@ -489,20 +497,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             
             // If remaining is 6.5s or less (and valid), switch BGM
             if (remaining <= 6.5 && remaining > -1) {
-                 // Ensure main BGM is stopped first
-                 if (mainThinkingAudioRef.current && !mainThinkingAudioRef.current.paused) {
-                     mainThinkingAudioRef.current.pause();
-                 }
+                 // Check if we already triggered the switch for this question
+                 if (!hasTriggeredCountdownRef.current) {
+                     hasTriggeredCountdownRef.current = true; // Mark as done
 
-                 if (thinkingAudioRef.current && thinkingAudioRef.current.paused && thinkingSound.url) {
-                      playThinkingSound();
-                 } else if (!thinkingAudioRef.current && thinkingSound.url) {
-                      playThinkingSound();
+                     // Ensure main BGM is stopped first
+                     if (mainThinkingAudioRef.current && !mainThinkingAudioRef.current.paused) {
+                         mainThinkingAudioRef.current.pause();
+                     }
+                     // Play countdown sound
+                     playThinkingSound();
                  }
             }
         }, 200);
     } else {
-        // Stop sound if timer stops or state changes (handled by stopThinkingSound in actions usually, but safety check)
+        // Timer stopped
     }
     return () => clearInterval(interval);
   }, [state.gameState, state.isTimerRunning, state.questionStartTime, state.timeLimit, thinkingSound.url, isThinkingLoop, mainThinkingSound.url]);
@@ -539,6 +548,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       isTimerRunning: false
     }));
     stopThinkingSound();
+    hasTriggeredCountdownRef.current = false;
     addLog("ゲームをリセットしました");
   };
 
