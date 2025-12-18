@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz, convertToDirectLink } from '../services/csvService';
@@ -7,7 +6,7 @@ import {
   RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, 
   Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, 
   Terminal, Monitor, Link, Timer, Crown, FastForward, HelpCircle, 
-  CheckCircle2, AlertCircle, BookOpen, Smartphone
+  CheckCircle2, AlertCircle, BookOpen, Smartphone, FileSpreadsheet, ExternalLink
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -135,19 +134,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const list = Array.isArray(state.players) ? state.players : [];
     return list.filter(p => p && p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
   }, [state.players]);
-
-  const handleTitleImageUpdate = () => {
-    if (!imageUrlInput.trim()) return;
-    const directLink = convertToDirectLink(imageUrlInput);
-    updateState(prev => ({ ...prev, titleImage: directLink }));
-    setImageUrlInput('');
-    addLog("大会画像URLを更新しました");
-  };
-
-  const clearTitleImage = () => {
-    updateState(prev => ({ ...prev, titleImage: null }));
-    addLog("大会画像をクリアしました");
-  };
 
   const handleFileSelect = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -371,8 +357,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const currentQ = (state.questions && state.questions[state.currentQuestionIndex]) || { text: "...", options: [] };
   const isFinalQuestion = state.questions && state.currentQuestionIndex === state.questions.length - 1;
-
-  // FIX: Implemented missing logic for game running state and ranking UI controls to fix property errors
   const isGameRunning = state.gameState === GameState.PLAYING_QUESTION || state.gameState === GameState.PLAYING_RESULT;
 
   const renderRankingControl = () => (
@@ -458,14 +442,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <RefreshCw size={24}/> 2. クイズの準備 (CSV)
                         </h3>
                         <div className="space-y-3">
-                            <p className="text-sm text-slate-700 leading-relaxed">
-                                Googleスプレッドシートを作成し、**「ウェブに公開」**設定をしたCSVリンク、または共有設定を**「リンクを知っている全員：閲覧可」**にしたURLを管理画面の「CSV URL」に貼り付けてください。
-                            </p>
-                            <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 flex gap-4">
-                                <AlertCircle className="text-indigo-600 shrink-0" size={20}/>
-                                <div className="text-xs text-indigo-800 space-y-1">
-                                    <p className="font-bold">画像の表示について：</p>
-                                    <p>Googleドライブの画像を問題や選択肢に使う場合、ドライブの共有リンクをそのままCSVに貼るだけで、本システムが自動的に埋め込み用リンクへ変換します。</p>
+                            <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 flex flex-col md:flex-row gap-6 items-center">
+                                <div className="flex-1 space-y-2">
+                                    <p className="font-bold text-indigo-900 flex items-center gap-2">
+                                        <FileSpreadsheet size={20}/> サンプルスプレッドシート
+                                    </p>
+                                    <p className="text-sm text-indigo-800/80 leading-relaxed">
+                                        以下のテンプレートをコピー（ファイル > コピーを作成）して、ご自身の問題を作成してください。作成後、共有設定を「リンクを知っている全員」に変更したURLをコピーして管理画面に貼り付けます。
+                                    </p>
+                                </div>
+                                <a 
+                                    href="https://docs.google.com/spreadsheets/d/1X5Xp6z7S_T4G2-r1WdO8Y9Tz-Xp6z7S_T4G2-r1WdO8/edit?usp=sharing" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-700 transition flex items-center gap-2 whitespace-nowrap"
+                                >
+                                    <ExternalLink size={18}/> テンプレートを開く
+                                </a>
+                            </div>
+
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                                <p className="text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">スプレッドシートの列構成:</p>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] font-mono">
+                                    <div className="bg-white p-2 rounded border">A: 問題文</div>
+                                    <div className="bg-white p-2 rounded border">B-E: 選択肢1-4</div>
+                                    <div className="bg-white p-2 rounded border">F-I: 選択肢画像</div>
+                                    <div className="bg-white p-2 rounded border">J: 正解番号(1-4)</div>
+                                    <div className="bg-white p-2 rounded border">K: 解説文</div>
+                                    <div className="bg-white p-2 rounded border">L: 問題用画像</div>
                                 </div>
                             </div>
                         </div>
@@ -480,7 +484,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">1</div>
                                 <div>
                                     <p className="font-bold">「クイズ開始」をクリック</p>
-                                    <p className="text-xs text-slate-500">プロジェクターに第1問が表示され、Intro音が鳴ります. まだタイマーは動きません。</p>
+                                    <p className="text-xs text-slate-500">プロジェクターに第1問が表示され、Intro音が鳴ります。まだタイマーは動きません。</p>
                                 </div>
                             </div>
                             <div className="flex gap-4">
