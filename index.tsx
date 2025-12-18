@@ -1,3 +1,4 @@
+
 import React, { ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -11,9 +12,13 @@ interface ErrorBoundaryState {
   error: any;
 }
 
+// Added explicit state declaration to fix TypeScript errors regarding property existence
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState;
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
+    // Initialize state
     this.state = { hasError: false, error: null };
   }
 
@@ -26,13 +31,17 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   render() {
-    if (this.state.hasError) {
+    // Destructuring state and props to resolve "Property does not exist" errors in JSX
+    const { hasError, error } = this.state;
+    const { children } = this.props;
+
+    if (hasError) {
       return (
         <div style={{ padding: '20px', color: 'red', fontFamily: 'monospace', backgroundColor: '#fff', height: '100vh' }}>
           <h1>Something went wrong.</h1>
           <h3 style={{color: '#333'}}>Application Error</h3>
           <pre style={{ backgroundColor: '#f0f0f0', padding: '10px', borderRadius: '5px', overflow: 'auto' }}>
-            {this.state.error?.toString()}
+            {error?.toString()}
           </pre>
           <button 
             onClick={() => window.location.reload()}
@@ -44,7 +53,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       );
     }
 
-    return this.props.children;
+    return children;
   }
 }
 
