@@ -446,7 +446,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     </p>
                                 </div>
                                 <a 
-                                    href="https://docs.google.com/spreadsheets/d/1RozpHh9965r7qz4RsjWgOSKYfQnsSNkqI0Jua1ElfTs/edit?usp=sharing 
+                                    href="https://docs.google.com/spreadsheets/d/1RozpHh9965r7qz4RsjWgOSKYfQnsSNkqI0Jua1ElfTs/edit?usp=sharing"
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                     className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-700 transition flex items-center gap-2 whitespace-nowrap"
