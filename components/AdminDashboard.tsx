@@ -1,7 +1,14 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz, convertToDirectLink } from '../services/csvService';
-import { Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, Terminal, Monitor, Link, Timer, Crown, FastForward } from 'lucide-react';
+import { 
+  Loader2, Users, Trash2, Play, RotateCcw, ChevronRight, Eye, StopCircle, 
+  RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, 
+  Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, 
+  Terminal, Monitor, Link, Timer, Crown, FastForward, HelpCircle, 
+  CheckCircle2, AlertCircle, BookOpen, Smartphone
+} from 'lucide-react';
 
 interface AdminDashboardProps {
   state: HostState;
@@ -35,6 +42,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [logs, setLogs] = useState<string[]>([]);
   const [debugError, setDebugError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'PLAYERS' | 'QUIZ'>('PLAYERS');
+  const [isManualOpen, setIsManualOpen] = useState(false);
 
   const addLog = (msg: string) => {
       setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 50));
@@ -52,23 +60,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }))
   );
   
-  // --- Auto Sounds (Intro, Main Thinking, Countdown Thinking) ---
+  // --- Auto Sounds ---
   const [introSound, setIntroSound] = useState<{file: File|null, url: string|null}>({ file: null, url: null });
   const [mainThinkingSound, setMainThinkingSound] = useState<{file: File|null, url: string|null}>({ file: null, url: null });
   const [thinkingSound, setThinkingSound] = useState<{file: File|null, url: string|null}>({ file: null, url: null });
   
   const [isMainThinkingLoop, setIsMainThinkingLoop] = useState(true);
-  const [isThinkingLoop, setIsThinkingLoop] = useState(false); // Countdown usually doesn't loop
+  const [isThinkingLoop, setIsThinkingLoop] = useState(false);
 
   const audioRefs = useRef<(HTMLAudioElement | null)[]>(new Array(6).fill(null));
   const introAudioRef = useRef<HTMLAudioElement | null>(null);
   const mainThinkingAudioRef = useRef<HTMLAudioElement | null>(null);
   const thinkingAudioRef = useRef<HTMLAudioElement | null>(null);
   
-  // Flag to ensure countdown sound triggers only once per question
   const hasTriggeredCountdownRef = useRef(false);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       soundSlots.forEach(slot => {
@@ -78,16 +84,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (mainThinkingSound.url) URL.revokeObjectURL(mainThinkingSound.url);
       if (thinkingSound.url) URL.revokeObjectURL(thinkingSound.url);
 
-      if (audioRefs.current) {
-        audioRefs.current.forEach(audio => {
-          if (audio) {
-            audio.pause();
-            audio.src = '';
-            audio.onended = null;
-            audio.onerror = null;
-          }
-        });
-      }
+      audioRefs.current.forEach(audio => {
+        if (audio) {
+          audio.pause();
+          audio.src = '';
+        }
+      });
       if (introAudioRef.current) {
           introAudioRef.current.pause();
           introAudioRef.current.src = '';
@@ -113,36 +115,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const validPlayers = players.filter(p => p && typeof p === 'object' && p.id);
         
         return [...validPlayers].sort((a, b) => {
-            // Organizer sort: Organizers go to the bottom
             if (a.isOrganizer && !b.isOrganizer) return 1;
             if (!a.isOrganizer && b.isOrganizer) return -1;
-
             const scoreA = typeof a.score === 'number' ? a.score : 0;
             const scoreB = typeof b.score === 'number' ? b.score : 0;
             if (scoreB !== scoreA) return scoreB - scoreA;
-            
             const timeA = typeof a.totalResponseTime === 'number' ? a.totalResponseTime : 0;
             const timeB = typeof b.totalResponseTime === 'number' ? b.totalResponseTime : 0;
             if (timeA !== timeB) return timeA - timeB;
-            
-            const nameA = a.name ? String(a.name) : '';
-            const nameB = b.name ? String(b.name) : '';
-            return nameA.localeCompare(nameB);
+            return (a.name || '').localeCompare(b.name || '');
         });
     } catch (e: any) {
         console.error("Sort error", e);
-        setDebugError(`Sort Error: ${e.message}`);
         return [];
     }
   }, [state.players]);
 
   const answeredCount = useMemo(() => {
-    try {
-        const list = Array.isArray(state.players) ? state.players : [];
-        return list.filter(p => p && p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
-    } catch (e) {
-        return 0;
-    }
+    const list = Array.isArray(state.players) ? state.players : [];
+    return list.filter(p => p && p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
   }, [state.players]);
 
   const handleTitleImageUpdate = () => {
@@ -158,31 +149,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     addLog("大会画像をクリアしました");
   };
 
-  // --- Sound Logic ---
-
   const handleFileSelect = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Ensure audioRefs is initialized
-      if (!audioRefs.current) {
-         audioRefs.current = new Array(6).fill(null);
-      }
-
-      // Cleanup old audio if exists
       if (audioRefs.current[index]) {
-        const oldAudio = audioRefs.current[index];
-        if (oldAudio) {
-            oldAudio.pause();
-            oldAudio.src = '';
-            oldAudio.onended = null;
-            oldAudio.onerror = null;
-        }
+        audioRefs.current[index]!.pause();
         audioRefs.current[index] = null;
       }
-      
       const oldSlot = soundSlots[index];
       if (oldSlot.url) URL.revokeObjectURL(oldSlot.url);
-      
       const url = URL.createObjectURL(file);
       setSoundSlots(prev => prev.map((slot, i) => i === index ? { ...slot, file, url, isPlaying: false } : slot));
       addLog(`Slot #${index + 1}: ファイルをセットしました (${file.name})`);
@@ -190,61 +165,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const togglePlaySound = (index: number) => {
-    try {
-        const slot = soundSlots[index];
-        if (!slot.url) return;
-        
-        // Safety check for audioRefs
-        if (!audioRefs.current) audioRefs.current = new Array(6).fill(null);
-        let audio = audioRefs.current[index];
+    const slot = soundSlots[index];
+    if (!slot.url) return;
+    
+    let audio = audioRefs.current[index];
+    if (!audio) {
+        audio = new Audio(slot.url);
+        audioRefs.current[index] = audio;
+    }
+    audio.volume = slot.volume;
+    audio.loop = slot.isLoop;
+    audio.onended = () => {
+         if (!audio?.loop) setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
+    };
 
-        if (!audio) {
-            audio = new Audio(slot.url);
-            audioRefs.current[index] = audio;
-        }
-        audio.volume = slot.volume;
-        audio.loop = slot.isLoop;
-        
-        // Ensure cleanup of event listeners to avoid duplicates or memory leaks
-        audio.onended = null;
-        audio.onerror = null;
-
-        audio.onended = () => {
-             if (audio && audio.loop) return;
-             setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-        };
-        audio.onerror = (e) => {
-            console.error(`Audio error slot ${index}`, e);
-            addLog(`Slot #${index + 1} Error: 再生失敗`);
-            setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-        };
-
-        if (slot.isPlaying) {
-            // Stop logic
-            audio.pause();
-            audio.currentTime = 0;
-            setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-        } else {
-            // Play logic
-            audio.currentTime = 0; 
-            const playPromise = audio.play();
-            if (playPromise !== undefined) {
-                playPromise.then(() => {
-                    setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
-                }).catch(e => {
-                    console.error("Play error", e);
-                    setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
-                });
-            }
-        }
-    } catch (e: any) {
-        addLog(`Sound Logic Error: ${e.message}`);
+    if (slot.isPlaying) {
+        audio.pause();
+        audio.currentTime = 0;
         setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: false } : s));
+    } else {
+        audio.currentTime = 0; 
+        audio.play().then(() => {
+            setSoundSlots(prev => prev.map((s, i) => i === index ? { ...s, isPlaying: true } : s));
+        }).catch(e => console.error(e));
     }
   };
 
   const stopSound = (index: number) => {
-    const audio = audioRefs.current?.[index];
+    const audio = audioRefs.current[index];
     if (audio) {
       audio.pause();
       audio.currentTime = 0;
@@ -256,14 +204,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
      setSoundSlots(prev => prev.map((s, i) => {
          if (i !== index) return s;
          const newLoop = !s.isLoop;
-         if (audioRefs.current && audioRefs.current[index]) {
-             audioRefs.current[index]!.loop = newLoop;
-         }
+         if (audioRefs.current[index]) audioRefs.current[index]!.loop = newLoop;
          return { ...s, isLoop: newLoop };
      }));
   };
 
-  // --- Auto Sound Handlers ---
   const handleIntroSoundSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
@@ -297,107 +242,61 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const toggleMainThinkingLoop = () => {
       const newLoop = !isMainThinkingLoop;
       setIsMainThinkingLoop(newLoop);
-      if (mainThinkingAudioRef.current) {
-          mainThinkingAudioRef.current.loop = newLoop;
-      }
+      if (mainThinkingAudioRef.current) mainThinkingAudioRef.current.loop = newLoop;
   };
 
   const toggleThinkingLoop = () => {
       const newLoop = !isThinkingLoop;
       setIsThinkingLoop(newLoop);
-      if (thinkingAudioRef.current) {
-          thinkingAudioRef.current.loop = newLoop;
-      }
+      if (thinkingAudioRef.current) thinkingAudioRef.current.loop = newLoop;
   };
 
   const playIntroSound = () => {
       if (introSound.url) {
-          if (introAudioRef.current) {
-              introAudioRef.current.pause();
-              introAudioRef.current.currentTime = 0;
-          } else {
-              introAudioRef.current = new Audio(introSound.url);
-          }
+          if (!introAudioRef.current) introAudioRef.current = new Audio(introSound.url);
           introAudioRef.current.src = introSound.url;
-          introAudioRef.current.play().catch(e => console.error("Intro play fail", e));
+          introAudioRef.current.play().catch(e => console.error(e));
       }
   };
 
   const playMainThinkingSound = () => {
       if (mainThinkingSound.url) {
-          if (mainThinkingAudioRef.current) {
-               if (!mainThinkingAudioRef.current.paused) return;
-               mainThinkingAudioRef.current.currentTime = 0;
-          } else {
-               mainThinkingAudioRef.current = new Audio(mainThinkingSound.url);
-          }
-          mainThinkingAudioRef.current.loop = isMainThinkingLoop;
+          if (!mainThinkingAudioRef.current) mainThinkingAudioRef.current = new Audio(mainThinkingSound.url);
           mainThinkingAudioRef.current.src = mainThinkingSound.url;
-          mainThinkingAudioRef.current.play().catch(e => console.error("Main Thinking play fail", e));
+          mainThinkingAudioRef.current.loop = isMainThinkingLoop;
+          mainThinkingAudioRef.current.play().catch(e => console.error(e));
       }
   };
 
   const playThinkingSound = () => {
       if (thinkingSound.url) {
-          // Ensure main BGM is stopped
-          if (mainThinkingAudioRef.current) {
-              mainThinkingAudioRef.current.pause();
-              mainThinkingAudioRef.current.currentTime = 0;
-          }
-
-          if (thinkingAudioRef.current) {
-              // If already playing, don't restart unless specifically needed, 
-              // but here we want to prevent double-triggering logic in useEffect
-              if (!thinkingAudioRef.current.paused) return; 
-              thinkingAudioRef.current.currentTime = 0;
-          } else {
-              thinkingAudioRef.current = new Audio(thinkingSound.url);
-          }
-          thinkingAudioRef.current.loop = isThinkingLoop; // Apply current loop setting
+          if (mainThinkingAudioRef.current) mainThinkingAudioRef.current.pause();
+          if (!thinkingAudioRef.current) thinkingAudioRef.current = new Audio(thinkingSound.url);
           thinkingAudioRef.current.src = thinkingSound.url;
-          thinkingAudioRef.current.play().catch(e => console.error("Thinking play fail", e));
+          thinkingAudioRef.current.loop = isThinkingLoop;
+          thinkingAudioRef.current.play().catch(e => console.error(e));
       }
   };
 
   const stopThinkingSound = () => {
-      if (mainThinkingAudioRef.current) {
-          mainThinkingAudioRef.current.pause();
-          mainThinkingAudioRef.current.currentTime = 0;
-      }
-      if (thinkingAudioRef.current) {
-          thinkingAudioRef.current.pause();
-          thinkingAudioRef.current.currentTime = 0;
-      }
+      if (mainThinkingAudioRef.current) { mainThinkingAudioRef.current.pause(); mainThinkingAudioRef.current.currentTime = 0; }
+      if (thinkingAudioRef.current) { thinkingAudioRef.current.pause(); thinkingAudioRef.current.currentTime = 0; }
   };
-
-
-  // --- Game Control ---
 
   const loadQuestions = async () => {
     if (!csvUrl) return;
     setIsLoading(true);
     addLog('CSV読み込み開始...');
-    
     try {
       const questions = await parseCSVQuiz(csvUrl);
-      if (!Array.isArray(questions) || questions.length === 0) throw new Error("有効な問題データが見つかりませんでした。");
-
       updateState(prev => ({
-        ...prev,
-        questions,
-        gameState: GameState.LOBBY,
-        currentQuestionIndex: 0,
-        rankingRevealStage: 0,
-        isRankingResultVisible: false,
-        hideBelowTop3: false,
-        quizTitle: titleInput
+        ...prev, questions, gameState: GameState.LOBBY, currentQuestionIndex: 0,
+        rankingRevealStage: 0, isRankingResultVisible: false, quizTitle: titleInput
       }));
       addLog(`成功！ ${questions.length}問をロードしました`);
     } catch (err: any) {
-      console.error("Load Error:", err);
-      const msg = err instanceof Error ? err.message : String(err);
-      addLog(`読み込みエラー: ${msg}`);
-      alert(`読み込みエラー: ${msg}`);
+      addLog(`エラー: ${err.message}`);
+      alert(`読み込みエラー: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -405,227 +304,261 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const startGame = () => {
     resetPlayerScores();
-    hasTriggeredCountdownRef.current = false; // Reset BGM trigger
+    hasTriggeredCountdownRef.current = false;
     updateState(prev => ({
-      ...prev,
-      currentQuestionIndex: 0,
-      gameState: GameState.PLAYING_QUESTION,
-      questionStartTime: null, // Timer not started yet
-      isTimerRunning: false,
-      timeLimit: customTimeLimit,
-      rankingRevealStage: 0,
-      isRankingResultVisible: false
+      ...prev, currentQuestionIndex: 0, gameState: GameState.PLAYING_QUESTION,
+      isTimerRunning: false, timeLimit: customTimeLimit
     }));
     playIntroSound();
-    addLog("クイズを開始しました (タイマー待機中)");
+    addLog("クイズ開始");
   };
 
   const startTimer = () => {
-      hasTriggeredCountdownRef.current = false; // Reset BGM trigger for this question
-      updateState(prev => ({
-          ...prev,
-          isTimerRunning: true,
-          questionStartTime: Date.now()
-      }));
+      hasTriggeredCountdownRef.current = false;
+      updateState(prev => ({ ...prev, isTimerRunning: true, questionStartTime: Date.now() }));
       playMainThinkingSound();
-      addLog("タイマースタート！(メインBGM開始)");
+      addLog("タイマースタート");
   };
 
   const showResults = async () => {
     stopThinkingSound();
-    addLog("回答締め切り・集計中...");
     await calculateAndSaveScores();
-    updateState(prev => ({
-      ...prev,
-      gameState: GameState.PLAYING_RESULT,
-      questionStartTime: null,
-      isTimerRunning: false 
-    }));
-    addLog("正解を表示しました");
+    updateState(prev => ({ ...prev, gameState: GameState.PLAYING_RESULT, isTimerRunning: false }));
+    addLog("正解を表示");
   };
 
   const nextQuestion = () => {
     resetPlayerAnswers();
-    hasTriggeredCountdownRef.current = false; // Reset BGM trigger
+    hasTriggeredCountdownRef.current = false;
     updateState(prev => {
       const nextIndex = prev.currentQuestionIndex + 1;
-      if (nextIndex >= prev.questions.length) {
-        addLog("最終結果画面へ移行");
-        return { 
-            ...prev, 
-            gameState: GameState.FINAL_RESULT,
-            rankingRevealStage: 0, 
-            isRankingResultVisible: false
-        };
-      }
-      addLog(`第${nextIndex + 1}問へ移行`);
-      return {
-        ...prev,
-        currentQuestionIndex: nextIndex,
-        gameState: GameState.PLAYING_QUESTION,
-        questionStartTime: null, // Reset timer
-        isTimerRunning: false,
-        timeLimit: customTimeLimit
-      };
+      if (nextIndex >= prev.questions.length) return { ...prev, gameState: GameState.FINAL_RESULT, rankingRevealStage: 0 };
+      return { ...prev, currentQuestionIndex: nextIndex, gameState: GameState.PLAYING_QUESTION, isTimerRunning: false };
     });
     playIntroSound();
   };
   
   const forceFinishGame = () => {
-      if (!confirm("本当にクイズを終了して、最終結果発表に移りますか？\n（残りの問題はスキップされます）")) return;
-
+      if (!confirm("強制終了しますか？")) return;
       stopThinkingSound();
-      addLog("管理者操作によりクイズを強制終了しました");
-
-      updateState(prev => ({
-        ...prev,
-        gameState: GameState.FINAL_RESULT,
-        rankingRevealStage: 0,
-        isRankingResultVisible: false,
-        questionStartTime: null,
-        isTimerRunning: false
-      }));
+      updateState(prev => ({ ...prev, gameState: GameState.FINAL_RESULT, rankingRevealStage: 0 }));
   };
 
-  // Monitor timer to trigger thinking sound at 6 seconds remaining
+  const goToStage = (stage: number) => updateState(prev => ({ ...prev, rankingRevealStage: stage, isRankingResultVisible: false }));
+  const revealStage = () => updateState(prev => ({ ...prev, isRankingResultVisible: true }));
+  const toggleHideBelowTop3 = () => updateState(prev => ({ ...prev, hideBelowTop3: !prev.hideBelowTop3 }));
+  const toggleLobbyDetails = () => updateState(prev => ({ ...prev, isLobbyDetailsVisible: !prev.isLobbyDetailsVisible }));
+
+  const resetGame = () => {
+    updateState(prev => ({ ...prev, gameState: GameState.SETUP, questions: [], isTimerRunning: false }));
+    stopThinkingSound();
+    addLog("リセットしました");
+  };
+
   useEffect(() => {
     let interval: any;
     if (state.gameState === GameState.PLAYING_QUESTION && state.isTimerRunning && state.questionStartTime) {
         interval = setInterval(() => {
-            const elapsed = (Date.now() - (state.questionStartTime || 0)) / 1000;
-            const remaining = state.timeLimit - elapsed;
-            
-            // If remaining is 6.5s or less (and valid), switch BGM
-            if (remaining <= 6.5 && remaining > -1) {
-                 // Check if we already triggered the switch for this question
-                 if (!hasTriggeredCountdownRef.current) {
-                     hasTriggeredCountdownRef.current = true; // Mark as done
-
-                     // Ensure main BGM is stopped first
-                     if (mainThinkingAudioRef.current && !mainThinkingAudioRef.current.paused) {
-                         mainThinkingAudioRef.current.pause();
-                     }
-                     // Play countdown sound
-                     playThinkingSound();
-                 }
+            const remaining = state.timeLimit - (Date.now() - state.questionStartTime!) / 1000;
+            if (remaining <= 6.5 && !hasTriggeredCountdownRef.current) {
+                 hasTriggeredCountdownRef.current = true;
+                 playThinkingSound();
             }
         }, 200);
-    } else {
-        // Timer stopped
     }
     return () => clearInterval(interval);
-  }, [state.gameState, state.isTimerRunning, state.questionStartTime, state.timeLimit, thinkingSound.url, isThinkingLoop, mainThinkingSound.url]);
+  }, [state.gameState, state.isTimerRunning, state.questionStartTime, state.timeLimit]);
 
-  const goToStage = (stage: number) => {
-      updateState(prev => ({ 
-          ...prev, 
-          rankingRevealStage: stage, 
-          isRankingResultVisible: false 
-      }));
-  };
+  const currentQ = (state.questions && state.questions[state.currentQuestionIndex]) || { text: "...", options: [] };
+  const isFinalQuestion = state.questions && state.currentQuestionIndex === state.questions.length - 1;
 
-  const revealStage = () => {
-      updateState(prev => ({ ...prev, isRankingResultVisible: true }));
-  };
-  
-  const toggleHideBelowTop3 = () => {
-      updateState(prev => ({ ...prev, hideBelowTop3: !prev.hideBelowTop3 }));
-  };
-  
-  const toggleLobbyDetails = () => {
-    updateState(prev => ({ ...prev, isLobbyDetailsVisible: !prev.isLobbyDetailsVisible }));
-  };
-
-  const resetGame = () => {
-    updateState(prev => ({
-      ...prev,
-      gameState: GameState.SETUP,
-      questions: [],
-      rankingRevealStage: 0,
-      isRankingResultVisible: false,
-      hideBelowTop3: false,
-      isLobbyDetailsVisible: false,
-      isTimerRunning: false
-    }));
-    stopThinkingSound();
-    hasTriggeredCountdownRef.current = false;
-    addLog("ゲームをリセットしました");
-  };
-
-  const currentQ = (state.questions && state.questions[state.currentQuestionIndex]) 
-    ? state.questions[state.currentQuestionIndex]
-    : { text: "Loading...", options: [] };
-
-  const isFinalQuestion = state.questions && state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
-
-  const renderRankingControl = () => {
-      const stage = state.rankingRevealStage;
-      const visible = state.isRankingResultVisible;
-
-      if (stage === 0) {
-          return (
-             <button onClick={() => goToStage(1)} className="w-full bg-amber-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-amber-700 flex items-center justify-center gap-2">
-                 <Medal size={24}/> 3位の発表準備 (READY)
-             </button>
-          );
-      } else if (stage === 1) {
-          if (!visible) {
-              return (
-                 <button onClick={revealStage} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700 flex items-center justify-center gap-2 animate-pulse">
-                     <Unlock size={24}/> 3位をオープン (OPEN)
-                 </button>
-              );
-          } else {
-              return (
-                 <button onClick={() => goToStage(2)} className="w-full bg-slate-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-slate-700 flex items-center justify-center gap-2">
-                     <Medal size={24}/> 2位の発表準備 (READY)
-                 </button>
-              );
-          }
-      } else if (stage === 2) {
-          if (!visible) {
-              return (
-                 <button onClick={revealStage} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700 flex items-center justify-center gap-2 animate-pulse">
-                     <Unlock size={24}/> 2位をオープン (OPEN)
-                 </button>
-              );
-          } else {
-              return (
-                 <button onClick={() => goToStage(3)} className="w-full bg-yellow-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-yellow-700 flex items-center justify-center gap-2">
-                     <Trophy size={24}/> 優勝者の発表準備 (READY)
-                 </button>
-              );
-          }
-      } else if (stage === 3) {
-          if (!visible) {
-               return (
-                 <button onClick={revealStage} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700 flex items-center justify-center gap-2 animate-pulse">
-                     <Unlock size={24}/> 優勝者をオープン (OPEN)
-                 </button>
-              );
-          } else {
-              return (
-                 <button disabled className="w-full bg-slate-300 text-slate-500 py-4 rounded-lg font-bold text-xl shadow flex items-center justify-center gap-2">
-                     発表終了
-                 </button>
-              );
-          }
-      }
-      return null;
-  };
-
+  // FIX: Implemented missing logic for game running state and ranking UI controls to fix property errors
   const isGameRunning = state.gameState === GameState.PLAYING_QUESTION || state.gameState === GameState.PLAYING_RESULT;
+
+  const renderRankingControl = () => (
+    <div className="space-y-3 bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+      <h3 className="text-sm font-bold text-indigo-800 flex items-center gap-2 mb-2">
+        <Trophy size={16} /> ランキング発表
+      </h3>
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={() => goToStage(0)} className={`py-2 text-xs rounded font-bold ${state.rankingRevealStage === 0 ? 'bg-indigo-600 text-white' : 'bg-white border'}`}>準備</button>
+        <button onClick={() => goToStage(1)} className={`py-2 text-xs rounded font-bold ${state.rankingRevealStage === 1 ? 'bg-indigo-600 text-white' : 'bg-white border'}`}>3位</button>
+        <button onClick={() => goToStage(2)} className={`py-2 text-xs rounded font-bold ${state.rankingRevealStage === 2 ? 'bg-indigo-600 text-white' : 'bg-white border'}`}>2位</button>
+        <button onClick={() => goToStage(3)} className={`py-2 text-xs rounded font-bold ${state.rankingRevealStage === 3 ? 'bg-indigo-600 text-white' : 'bg-white border'}`}>1位</button>
+      </div>
+      <button onClick={revealStage} className="w-full mt-2 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 flex items-center justify-center gap-2 shadow-sm">
+        <Eye size={18} /> 結果を表示 (プロジェクター)
+      </button>
+      <div className="mt-4 pt-4 border-t border-indigo-200">
+        <button onClick={toggleHideBelowTop3} className="w-full py-2 text-xs flex items-center justify-center gap-2 text-indigo-700 hover:bg-indigo-100 rounded transition">
+           {state.hideBelowTop3 ? <Eye size={14}/> : <EyeOff size={14}/>}
+           {state.hideBelowTop3 ? '4位以下も表示する' : '4位以下を隠す'}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans pb-20">
       <header className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md">
         <div className="flex items-center gap-4">
            <h1 className="text-xl font-bold bg-red-600 px-3 py-1 rounded">ADMIN MODE</h1>
-           <span className="text-slate-400 text-sm hidden sm:inline">Status: {state.gameState}</span>
-           <span className="text-slate-400 text-sm border-l border-slate-700 pl-4 hidden sm:inline">Title: {state.quizTitle}</span>
+           <button 
+             onClick={() => setIsManualOpen(true)}
+             className="flex items-center gap-1 text-slate-400 hover:text-white transition text-sm bg-slate-800 px-3 py-1 rounded-full border border-slate-700"
+           >
+             <HelpCircle size={16}/> 使い方
+           </button>
         </div>
         <button onClick={onBack} className="text-sm hover:underline text-slate-300">終了する</button>
       </header>
+
+      {/* Manual Modal */}
+      {isManualOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-4xl h-[85vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+                <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-indigo-600 p-2 rounded-xl">
+                            <BookOpen size={24}/>
+                        </div>
+                        <div>
+                            <h2 className="text-xl font-black">管理者用操作マニュアル</h2>
+                            <p className="text-xs text-slate-400">AIクイズ大会システムの運用ガイド</p>
+                        </div>
+                    </div>
+                    <button onClick={() => setIsManualOpen(false)} className="p-2 hover:bg-slate-800 rounded-full transition">
+                        <X size={24}/>
+                    </button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-8 space-y-10">
+                    <section className="space-y-4">
+                        <h3 className="text-2xl font-black text-indigo-600 flex items-center gap-2 border-b pb-2">
+                            <Monitor size={24}/> 1. 基本構成と役割
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                                <div className="font-bold text-slate-800 mb-1 flex items-center gap-2"><Monitor size={16} className="text-indigo-600"/> プロジェクター用</div>
+                                <p className="text-xs text-slate-500">大型スクリーンに映す「見る専用」の画面です。操作は一切できません。</p>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                                <div className="font-bold text-slate-800 mb-1 flex items-center gap-2"><Terminal size={16} className="text-red-600"/> 管理者操作用</div>
+                                <p className="text-xs text-slate-500">本画面です。クイズの進行、音響、参加者の管理をすべてここで行います。</p>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                                <div className="font-bold text-slate-800 mb-1 flex items-center gap-2"><Smartphone size={16} className="text-pink-600"/> プレイヤー用</div>
+                                <p className="text-xs text-slate-500">参加者がスマホでアクセスする画面。回答ボタンのみが表示されます。</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="space-y-4">
+                        <h3 className="text-2xl font-black text-indigo-600 flex items-center gap-2 border-b pb-2">
+                            <RefreshCw size={24}/> 2. クイズの準備 (CSV)
+                        </h3>
+                        <div className="space-y-3">
+                            <p className="text-sm text-slate-700 leading-relaxed">
+                                Googleスプレッドシートを作成し、**「ウェブに公開」**設定をしたCSVリンク、または共有設定を**「リンクを知っている全員：閲覧可」**にしたURLを管理画面の「CSV URL」に貼り付けてください。
+                            </p>
+                            <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 flex gap-4">
+                                <AlertCircle className="text-indigo-600 shrink-0" size={20}/>
+                                <div className="text-xs text-indigo-800 space-y-1">
+                                    <p className="font-bold">画像の表示について：</p>
+                                    <p>Googleドライブの画像を問題や選択肢に使う場合、ドライブの共有リンクをそのままCSVに貼るだけで、本システムが自動的に埋め込み用リンクへ変換します。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="space-y-4">
+                        <h3 className="text-2xl font-black text-indigo-600 flex items-center gap-2 border-b pb-2">
+                            <Play size={24}/> 3. 本番の進行フロー
+                        </h3>
+                        <div className="space-y-4">
+                            <div className="flex gap-4">
+                                <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">1</div>
+                                <div>
+                                    <p className="font-bold">「クイズ開始」をクリック</p>
+                                    <p className="text-xs text-slate-500">プロジェクターに第1問が表示され、Intro音が鳴ります. まだタイマーは動きません。</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-4">
+                                <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">2</div>
+                                <div>
+                                    <p className="font-bold">「タイマースタート」をクリック</p>
+                                    <p className="text-xs text-slate-500">プレイヤーのスマホに回答ボタンが出現し、メインBGMが流れ始めます。</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-4">
+                                <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">3</div>
+                                <div>
+                                    <p className="font-bold">自動BGM切り替え (残り6秒)</p>
+                                    <p className="text-xs text-slate-500">残り時間が6秒になると、自動的に「カウントダウンBGM」へ切り替わり緊張感を演出します。</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-4">
+                                <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">4</div>
+                                <div>
+                                    <p className="font-bold">「正解を表示」をクリック</p>
+                                    <p className="text-xs text-slate-500">回答を締め切り、BGMを停止して正解と解説を表示します。このタイミングでスコアが計算されます。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section className="space-y-4">
+                        <h3 className="text-2xl font-black text-indigo-600 flex items-center gap-2 border-b pb-2">
+                            <Music size={24}/> 4. 音響システム
+                        </h3>
+                        <ul className="list-disc list-inside text-sm text-slate-700 space-y-2 ml-4">
+                            <li><strong>自動再生:</strong> 「問題表示時」「タイマー中」「カウントダウン」の3種は設定しておくと自動で流れます。</li>
+                            <li><strong>手動ポン出し:</strong> Slot #1〜#6には、拍手やドラムロールなどの効果音ファイルをセットして、好きなタイミングで再生できます。</li>
+                            <li><strong>Loop設定:</strong> ループをONにすると、ファイルが終わっても自動的に頭出し再生されます。メインBGMに推奨です。</li>
+                        </ul>
+                    </section>
+
+                    <section className="space-y-4">
+                        <h3 className="text-2xl font-black text-indigo-600 flex items-center gap-2 border-b pb-2">
+                            <Users size={24}/> 5. 参加者・ランキング管理
+                        </h3>
+                        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 space-y-4">
+                            <div className="flex items-start gap-3">
+                                <Crown className="text-yellow-500 shrink-0" size={20}/>
+                                <div>
+                                    <p className="font-bold text-sm">主催者(Organizer)モード</p>
+                                    <p className="text-xs text-slate-500">参加者リストの王冠アイコンをONにすると、その人は「主催者枠」となり、スコアが高くてもランキング上は必ず最下位に固定されます。</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <Trash2 className="text-red-500 shrink-0" size={20}/>
+                                <div>
+                                    <p className="font-bold text-sm">キック機能</p>
+                                    <p className="text-xs text-slate-500">不適切な名前のユーザーや、切断された重複ユーザーを強制退出させることができます。</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <EyeOff className="text-slate-500 shrink-0" size={20}/>
+                                <div>
+                                    <p className="font-bold text-sm">4位以下の非表示設定</p>
+                                    <p className="text-xs text-slate-500">最終結果発表で「4位以下を隠す」をONにすると、プロジェクターには上位3名のみが表示され、表彰式の盛り上げに役立ちます。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <div className="p-6 bg-slate-50 border-t flex justify-center shrink-0">
+                    <button 
+                        onClick={() => setIsManualOpen(false)}
+                        className="bg-indigo-600 text-white px-10 py-3 rounded-full font-bold shadow-lg hover:bg-indigo-700 active:scale-95 transition flex items-center gap-2"
+                    >
+                        <CheckCircle2 size={20}/> 内容を理解しました
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
 
       <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1 space-y-6">
@@ -643,9 +576,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                    {state.isLobbyDetailsVisible ? <ImageIcon size={18}/> : <QrCode size={18}/>}
                    {state.isLobbyDetailsVisible ? 'タイトル画像モードへ' : 'QR・参加者モードへ'}
                </button>
-               <p className="text-[10px] text-slate-400 mt-2 text-center">
-                   プロジェクター画面の表示を切り替えます
-               </p>
             </div>
           )}
 
@@ -655,76 +585,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500">大会タイトル</label>
-                  <div className="flex items-center gap-2">
-                    <Type size={16} className="text-slate-400"/>
-                    <input 
-                      type="text" 
-                      value={titleInput}
-                      onChange={(e) => setTitleInput(e.target.value)}
-                      placeholder="例: 2024 忘年会クイズ"
-                      className="w-full px-3 py-2 border rounded text-sm"
-                    />
-                  </div>
+                  <input type="text" value={titleInput} onChange={(e) => setTitleInput(e.target.value)} placeholder="大会タイトル" className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
-
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">大会ロゴ/画像URL (任意)</label>
-                  <div className="flex items-center gap-2">
-                    {!state.titleImage ? (
-                      <div className="w-full flex gap-2">
-                          <div className="relative flex-1">
-                            <Link className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14}/>
-                            <input 
-                                type="text"
-                                value={imageUrlInput}
-                                onChange={(e) => setImageUrlInput(e.target.value)}
-                                placeholder="Google Drive URL貼り付け"
-                                className="w-full pl-8 pr-2 py-2 border rounded text-xs"
-                            />
-                          </div>
-                          <button 
-                             onClick={handleTitleImageUpdate}
-                             disabled={!imageUrlInput}
-                             className="bg-indigo-600 text-white px-3 py-1 rounded text-xs hover:bg-indigo-700 disabled:opacity-50"
-                          >
-                             Set
-                          </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between w-full p-2 border rounded bg-slate-50">
-                          <span className="text-xs text-green-600 font-bold flex items-center gap-1"><ImageIcon size={14}/> 画像セット済み</span>
-                          <button onClick={clearTitleImage} className="text-red-500 hover:text-red-700"><X size={16}/></button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-1 border-t pt-3">
                   <label className="text-xs font-bold text-slate-500">CSV URL</label>
-                  <input 
-                    type="text" 
-                    value={csvUrl}
-                    onChange={(e) => setCsvUrl(e.target.value)}
-                    placeholder="スプレッドシートのURLを貼り付け"
-                    className="w-full px-3 py-2 border rounded text-sm"
-                  />
+                  <input type="text" value={csvUrl} onChange={(e) => setCsvUrl(e.target.value)} placeholder="スプレッドシートURL" className="w-full px-3 py-2 border rounded text-sm" />
                 </div>
-                <p className="text-xs text-slate-500">※ 通常の編集用URLでも、CSV公開用URLでもOKです</p>
-                <button 
-                  onClick={loadQuestions}
-                  disabled={isLoading || !csvUrl}
-                  className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 font-bold text-sm"
-                >
+                <button onClick={loadQuestions} disabled={isLoading || !csvUrl} className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50 font-bold text-sm">
                   {isLoading ? <Loader2 className="animate-spin mx-auto"/> : 'ロード'}
                 </button>
               </div>
             ) : (
               <div className="space-y-3">
                 <p className="text-sm font-bold text-green-600">✅ {state.questions.length}問 ロード済み</p>
-                <p className="text-xs text-slate-500">Title: {state.quizTitle}</p>
-                <button onClick={resetGame} className="w-full border border-slate-300 py-2 rounded text-xs hover:bg-slate-50 text-slate-600">
-                  クイズデータを破棄してリセット
-                </button>
+                <button onClick={resetGame} className="w-full border border-slate-300 py-2 rounded text-xs hover:bg-slate-50 text-slate-600">リセット</button>
               </div>
             )}
           </div>
@@ -732,207 +606,88 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {state.questions.length > 0 && (
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-indigo-500">
               <h2 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-700"><Play size={20}/> 進行コントロール</h2>
-              
               <div className="space-y-4">
-                <div className="text-center p-4 bg-slate-50 rounded mb-4 relative overflow-hidden">
-                   <div className="text-xs text-slate-500 uppercase">現在の問題</div>
-                   <div className="text-xl font-bold text-slate-800">第 {state.currentQuestionIndex + 1} 問</div>
-                   <div className="text-sm text-slate-600 truncate">{currentQ?.text || 'Error'}</div>
-                   
-                   {isFinalQuestion && state.gameState !== GameState.FINAL_RESULT && (
-                     <div className="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold px-2 py-1">FINAL</div>
-                   )}
-                </div>
-
-                <div className="mb-4">
-                    <button 
-                        onClick={toggleHideBelowTop3}
-                        className={`w-full py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 border transition ${state.hideBelowTop3 ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}
-                    >
-                        {state.hideBelowTop3 ? <EyeOff size={16}/> : <Eye size={16}/>}
-                        {state.hideBelowTop3 ? '最終結果で4位以下を隠す (ON)' : '最終結果で4位以下を表示 (OFF)'}
-                    </button>
+                <div className="text-center p-4 bg-slate-50 rounded mb-4">
+                   <div className="text-xs text-slate-500 uppercase">第 {state.currentQuestionIndex + 1} 問</div>
+                   <div className="text-sm font-bold truncate">{currentQ.text}</div>
                 </div>
 
                 {state.gameState === GameState.LOBBY && (
-                  <div className="space-y-2">
-                     <div className="flex items-center gap-2 mb-2 bg-slate-50 p-2 rounded">
-                        <Clock size={16} className="text-slate-500"/>
-                        <span className="text-xs font-bold text-slate-500">制限時間(秒):</span>
-                        <input 
-                            type="number" 
-                            min="5" 
-                            max="300" 
-                            value={customTimeLimit} 
-                            onChange={(e) => setCustomTimeLimit(Number(e.target.value))}
-                            className="w-20 border rounded px-2 py-1 text-sm font-bold"
-                        />
-                     </div>
-                     <button onClick={startGame} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700">
-                        クイズ開始 (問題表示)
-                     </button>
-                  </div>
+                  <button onClick={startGame} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-green-700">クイズ開始</button>
                 )}
 
                 {state.gameState === GameState.PLAYING_QUESTION && (
                   <div className="space-y-3">
                       {!state.isTimerRunning ? (
-                          <>
-                            <div className="flex items-center gap-2 mb-2 bg-slate-50 p-2 rounded">
-                                <Clock size={16} className="text-slate-500"/>
-                                <span className="text-xs font-bold text-slate-500">制限時間(秒):</span>
-                                <input 
-                                    type="number" 
-                                    min="5" 
-                                    max="300" 
-                                    value={customTimeLimit} 
-                                    onChange={(e) => setCustomTimeLimit(Number(e.target.value))}
-                                    className="w-20 border rounded px-2 py-1 text-sm font-bold"
-                                />
-                            </div>
-                            <button onClick={startTimer} className="w-full bg-orange-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-orange-700 flex items-center justify-center gap-2 animate-pulse">
-                                <Timer size={24}/> タイマースタート！
-                            </button>
-                          </>
+                          <button onClick={startTimer} className="w-full bg-orange-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-orange-700 flex items-center justify-center gap-2 animate-pulse">
+                              <Timer size={24}/> タイマースタート
+                          </button>
                       ) : (
                           <div className="w-full bg-slate-100 text-slate-500 py-2 rounded-lg text-center text-sm font-bold border border-slate-200">
                               シンキングタイム中...
                           </div>
                       )}
-                      
-                      <button onClick={showResults} disabled={!state.isTimerRunning} className="w-full bg-indigo-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-indigo-700 disabled:opacity-50 disabled:bg-slate-400">
-                         正解を表示 (締め切り)
-                      </button>
+                      <button onClick={showResults} disabled={!state.isTimerRunning} className="w-full bg-indigo-600 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-indigo-700 disabled:opacity-50">正解を表示</button>
                   </div>
                 )}
 
                 {state.gameState === GameState.PLAYING_RESULT && (
-                  <button onClick={nextQuestion} className={`w-full text-white py-4 rounded-lg font-bold text-xl shadow flex justify-center items-center gap-2 ${isFinalQuestion ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-800 hover:bg-slate-900'}`}>
+                  <button onClick={nextQuestion} className="w-full bg-slate-800 text-white py-4 rounded-lg font-bold text-xl shadow hover:bg-slate-900 flex justify-center items-center gap-2">
                      {isFinalQuestion ? '最終結果へ' : '次の問題へ'} <ChevronRight/>
                   </button>
                 )}
 
-                {state.gameState === GameState.FINAL_RESULT && (
-                  <div className="space-y-4">
-                    <div className="text-center text-yellow-600 font-bold text-lg mb-2">
-                      最終結果発表中
-                    </div>
-                    {renderRankingControl()}
-                  </div>
-                )}
-
-                {/* Force Finish Button */}
-                {isGameRunning && (
-                    <div className="border-t border-slate-200 pt-4 mt-4">
-                         <button 
-                            onClick={forceFinishGame}
-                            className="w-full bg-slate-100 text-red-600 hover:bg-red-50 border border-red-200 py-2 rounded text-xs font-bold flex items-center justify-center gap-1"
-                         >
-                            <FastForward size={14} /> ⚠️ 残りの問題をスキップして結果発表へ
-                         </button>
-                    </div>
-                )}
+                {state.gameState === GameState.FINAL_RESULT && renderRankingControl()}
+                {isGameRunning && <button onClick={forceFinishGame} className="w-full bg-slate-100 text-red-600 hover:bg-red-50 py-2 rounded text-xs font-bold">強制終了</button>}
               </div>
             </div>
           )}
         </div>
 
         <div className="lg:col-span-2 flex flex-col gap-6">
-            
             <div className="bg-white rounded-xl shadow-sm border border-slate-200">
                <div className="p-4 border-b border-slate-200 flex items-center gap-2">
                   <Music size={20} className="text-indigo-600"/>
-                  <h2 className="font-bold text-lg text-slate-700">効果音 (Sound Board)</h2>
+                  <h2 className="font-bold text-lg text-slate-700">効果音 / BGM</h2>
                </div>
-               
-               {/* Auto Play Settings */}
                <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col gap-4">
-                   <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="flex-1 space-y-2">
-                            <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Monitor size={12}/> 問題表示時の効果音</label>
-                            <div className="flex gap-2 items-center">
-                                <label className="flex-1 border rounded bg-white px-2 py-1 text-xs cursor-pointer hover:bg-slate-50 truncate">
-                                    {introSound.file ? introSound.file.name : "ファイル選択..."}
-                                    <input type="file" accept="audio/*" className="hidden" onChange={handleIntroSoundSelect} />
-                                </label>
-                                {introSound.url && <button onClick={() => { if(introAudioRef.current) { introAudioRef.current.currentTime=0; introAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>}
-                            </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500">問題表示時SE</label>
+                            <input type="file" accept="audio/*" onChange={handleIntroSoundSelect} className="text-xs block w-full border rounded p-1 bg-white" />
                         </div>
-                        <div className="flex-1 space-y-2">
+                        <div className="space-y-2">
                             <div className="flex justify-between items-center">
-                                <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> メインBGM (〜残り6秒)</label>
-                                <div className="flex gap-2 items-center">
-                                    <button onClick={() => toggleMainThinkingLoop()} className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 ${isMainThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`} title="Loop ON/OFF">
-                                        <Repeat size={10}/> Loop: {isMainThinkingLoop ? 'ON' : 'OFF'}
-                                    </button>
-                                </div>
+                                <label className="text-xs font-bold text-slate-500">メインBGM (〜残り6秒)</label>
+                                <button onClick={toggleMainThinkingLoop} className={`px-2 py-0.5 rounded text-[10px] ${isMainThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200'}`}>Loop: {isMainThinkingLoop ? 'ON' : 'OFF'}</button>
                             </div>
-                            <div className="flex gap-2 items-center">
-                                <label className="flex-1 border rounded bg-white px-2 py-1 text-xs cursor-pointer hover:bg-slate-50 truncate">
-                                    {mainThinkingSound.file ? mainThinkingSound.file.name : "ファイル選択..."}
-                                    <input type="file" accept="audio/*" className="hidden" onChange={handleMainThinkingSoundSelect} />
-                                </label>
-                                {mainThinkingSound.url && (
-                                     <button onClick={() => { if(mainThinkingAudioRef.current) { mainThinkingAudioRef.current.currentTime=0; mainThinkingAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>
-                                )}
-                            </div>
+                            <input type="file" accept="audio/*" onChange={handleMainThinkingSoundSelect} className="text-xs block w-full border rounded p-1 bg-white" />
                         </div>
                    </div>
-                   
-                   <div className="flex-1 space-y-2 border-t pt-2">
+                   <div className="space-y-2 border-t pt-2">
                        <div className="flex justify-between items-center">
-                            <label className="text-xs font-bold text-slate-500 flex items-center gap-1"><Clock size={12}/> カウントダウンBGM (残り6秒〜)</label>
-                            <div className="flex gap-2 items-center">
-                                <button onClick={() => toggleThinkingLoop()} className={`px-2 py-0.5 rounded text-[10px] flex items-center gap-1 ${isThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`} title="Loop ON/OFF">
-                                    <Repeat size={10}/> Loop: {isThinkingLoop ? 'ON' : 'OFF'}
-                                </button>
-                            </div>
+                            <label className="text-xs font-bold text-slate-500">カウントダウンBGM (残り6秒〜)</label>
+                            <button onClick={toggleThinkingLoop} className={`px-2 py-0.5 rounded text-[10px] ${isThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200'}`}>Loop: {isThinkingLoop ? 'ON' : 'OFF'}</button>
                        </div>
-                       <div className="flex gap-2 items-center">
-                           <label className="flex-1 border rounded bg-white px-2 py-1 text-xs cursor-pointer hover:bg-slate-50 truncate">
-                               {thinkingSound.file ? thinkingSound.file.name : "ファイル選択..."}
-                               <input type="file" accept="audio/*" className="hidden" onChange={handleThinkingSoundSelect} />
-                           </label>
-                           {thinkingSound.url && <button onClick={() => { if(thinkingAudioRef.current) { thinkingAudioRef.current.currentTime=0; thinkingAudioRef.current.play(); } }} className="p-1 bg-green-500 text-white rounded"><Play size={12}/></button>}
-                       </div>
+                       <input type="file" accept="audio/*" onChange={handleThinkingSoundSelect} className="text-xs block w-full border rounded p-1 bg-white" />
                    </div>
                </div>
-
-               {/* Manual Slots */}
-               <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+               <div className="p-4 grid grid-cols-2 md:grid-cols-6 gap-3">
                   {soundSlots.map((slot, index) => (
-                    <div key={slot.id} className={`border rounded-lg p-2 flex flex-col gap-2 ${slot.isPlaying ? 'border-green-400 bg-green-50' : 'border-slate-200 bg-slate-50'}`}>
-                        <div className="flex justify-between items-center text-xs font-bold text-slate-500">
+                    <div key={slot.id} className={`border rounded-lg p-2 flex flex-col gap-2 ${slot.isPlaying ? 'border-green-400 bg-green-50' : 'bg-slate-50'}`}>
+                        <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
                            <span>Slot #{slot.id}</span>
-                           <button onClick={() => toggleLoop(index)} className={`${slot.isLoop ? 'text-indigo-600' : 'text-slate-300'} hover:text-indigo-500`} title="Loop BGM">
-                              <Repeat size={14}/>
-                           </button>
+                           <button onClick={() => toggleLoop(index)} className={slot.isLoop ? 'text-indigo-600' : 'text-slate-300'}><Repeat size={12}/></button>
                         </div>
-                        
                         {!slot.url ? (
-                           <label className="flex flex-col items-center justify-center h-16 border-2 border-dashed border-slate-300 rounded cursor-pointer hover:bg-slate-100 transition">
-                              <Upload size={16} className="text-slate-400 mb-1"/>
-                              <span className="text-[10px] text-slate-500">Select File</span>
+                           <label className="flex flex-col items-center justify-center h-12 border border-dashed border-slate-300 rounded cursor-pointer hover:bg-slate-100">
+                              <Upload size={14} className="text-slate-400"/>
                               <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleFileSelect(index, e)}/>
                            </label>
                         ) : (
-                           <div className="flex flex-col gap-2 h-16 justify-center">
-                              <div className="text-xs truncate font-bold text-slate-700" title={slot.file?.name || 'File'}>
-                                 {slot.file?.name}
-                              </div>
-                              <div className="flex gap-1 justify-center">
-                                 <button 
-                                    onClick={() => togglePlaySound(index)}
-                                    className={`p-2 rounded-full text-white shadow-md transition ${slot.isPlaying ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-600 hover:bg-green-700'}`}
-                                 >
-                                    {slot.isPlaying ? <RotateCcw size={16}/> : <Play size={16}/>}
-                                 </button>
-                                 {slot.isPlaying && (
-                                    <button onClick={() => stopSound(index)} className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 shadow-md">
-                                        <StopCircle size={16}/>
-                                    </button>
-                                 )}
-                              </div>
+                           <div className="flex gap-1 justify-center">
+                              <button onClick={() => togglePlaySound(index)} className={`p-2 rounded-full text-white ${slot.isPlaying ? 'bg-orange-500' : 'bg-green-600'}`}>{slot.isPlaying ? <RotateCcw size={12}/> : <Play size={12}/>}</button>
+                              {slot.isPlaying && <button onClick={() => stopSound(index)} className="p-2 bg-red-600 text-white rounded-full"><StopCircle size={12}/></button>}
                            </div>
                         )}
                     </div>
@@ -943,175 +698,56 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col flex-1 min-h-[400px]">
                 <div className="p-4 border-b border-slate-200 flex justify-between items-center">
                     <div className="flex gap-4">
-                        <button 
-                            onClick={() => setActiveTab('PLAYERS')}
-                            className={`text-sm font-bold flex items-center gap-2 pb-1 border-b-2 transition ${activeTab === 'PLAYERS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}
-                        >
-                            <Users size={18}/> 参加者管理 ({Array.isArray(state.players) ? state.players.length : 0}名)
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('QUIZ')}
-                            className={`text-sm font-bold flex items-center gap-2 pb-1 border-b-2 transition ${activeTab === 'QUIZ' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}
-                        >
-                            <Terminal size={18}/> 問題リスト (プレビュー)
-                        </button>
+                        <button onClick={() => setActiveTab('PLAYERS')} className={`text-sm font-bold pb-1 border-b-2 ${activeTab === 'PLAYERS' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>参加者 ({state.players.length})</button>
+                        <button onClick={() => setActiveTab('QUIZ')} className={`text-sm font-bold pb-1 border-b-2 ${activeTab === 'QUIZ' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400'}`}>問題リスト</button>
                     </div>
-
                     {activeTab === 'PLAYERS' && (
                         <div className="flex gap-2">
-                            <button 
-                            onClick={resetPlayerScores}
-                            className="px-3 py-1 text-xs border border-slate-300 rounded hover:bg-slate-100"
-                            >
-                            スコアリセット
-                            </button>
-                            <button 
-                            onClick={() => {
-                                if(confirm('本当に全員のデータを削除して強制退場させますか？')) resetAllPlayers();
-                            }}
-                            className="px-3 py-1 text-xs bg-red-100 text-red-600 rounded hover:bg-red-200"
-                            >
-                            全員キック
-                            </button>
+                            <button onClick={resetPlayerScores} className="px-2 py-1 text-[10px] border rounded hover:bg-slate-100">スコアリセット</button>
+                            <button onClick={() => confirm('全員キックしますか？') && resetAllPlayers()} className="px-2 py-1 text-[10px] bg-red-100 text-red-600 rounded">全員キック</button>
                         </div>
                     )}
                 </div>
-
                 <div className="flex-1 overflow-auto p-0">
                     {activeTab === 'PLAYERS' ? (
-                        <table className="w-full text-left border-collapse">
-                            <thead className="bg-slate-50 sticky top-0 text-xs uppercase text-slate-500 z-10">
-                                <tr>
-                                <th className="p-3">名前</th>
-                                <th className="p-3">スコア</th>
-                                <th className="p-3">合計時間</th>
-                                <th className="p-3">現在の回答</th>
-                                <th className="p-3 text-right">アクション</th>
-                                </tr>
+                        <table className="w-full text-left border-collapse text-xs">
+                            <thead className="bg-slate-50 sticky top-0 text-slate-500">
+                                <tr><th className="p-2">名前</th><th className="p-2">スコア</th><th className="p-2 text-right">操作</th></tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 text-sm">
-                                {sortedPlayers.length === 0 ? (
-                                <tr><td colSpan={5} className="p-8 text-center text-slate-400">参加者はまだいません</td></tr>
-                                ) : (
-                                sortedPlayers.map((player, index) => {
-                                    const hasAns = player.lastAnswerIndex !== null && player.lastAnswerIndex !== undefined;
-                                    const isCorrect = state.gameState === GameState.PLAYING_RESULT && player.lastAnswerIndex === state.questions[state.currentQuestionIndex]?.correctIndex;
-                                    const totalSec = ((player.totalResponseTime || 0) / 1000).toFixed(1);
-
-                                    return (
-                                    <tr key={player.id} className={`hover:bg-slate-50 group ${player.isOrganizer ? 'bg-gray-100 text-gray-500' : ''}`}>
-                                        <td className="p-3 font-bold text-slate-800">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-5 text-slate-400 text-xs">{index + 1}</span>
-                                            <div className={`w-2 h-2 rounded-full ${player.isOnline !== false ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                                            {player.name || 'No Name'}
-                                            {player.isOrganizer && <Crown size={14} className="text-yellow-500" />}
-                                        </div>
+                            <tbody className="divide-y divide-slate-100">
+                                {sortedPlayers.map((player, index) => (
+                                    <tr key={player.id} className="hover:bg-slate-50 group">
+                                        <td className="p-2 flex items-center gap-2">
+                                            <span className="text-slate-300 w-4">{index + 1}</span>
+                                            {player.name} {player.isOrganizer && <Crown size={12} className="text-yellow-500" />}
                                         </td>
-                                        <td className="p-3 font-mono font-bold text-indigo-600">{player.score || 0}</td>
-                                        <td className="p-3 font-mono text-xs text-slate-500 flex items-center gap-1">
-                                            <Clock size={12}/> {totalSec}s
-                                        </td>
-                                        <td className="p-3">
-                                        {hasAns ? (
-                                            state.gameState === GameState.PLAYING_RESULT ? (
-                                                <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-bold ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                    {isCorrect ? '正解' : '不正解'}
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-bold">
-                                                    回答済み
-                                                </span>
-                                            )
-                                        ) : (
-                                            <span className="text-slate-400 text-xs">-</span>
-                                        )}
-                                        </td>
-                                        <td className="p-3 text-right">
-                                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition">
-                                            <button
-                                                onClick={() => toggleOrganizer(player.id, !!player.isOrganizer)}
-                                                className={`p-1 ${player.isOrganizer ? 'text-yellow-500' : 'text-slate-300 hover:text-yellow-500'}`}
-                                                title={player.isOrganizer ? "主催者権限を外す" : "主催者としてマーク (最下位)"}
-                                            >
-                                                <Crown size={16} />
-                                            </button>
-                                            <button 
-                                                onClick={() => {
-                                                if(confirm(`${player.name}を退場させますか？`)) kickPlayer(player.id);
-                                                }}
-                                                className="p-1 text-slate-400 hover:text-red-600"
-                                                title="キック"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
+                                        <td className="p-2 font-bold">{player.score || 0}</td>
+                                        <td className="p-2 text-right space-x-2">
+                                            <button onClick={() => toggleOrganizer(player.id, !!player.isOrganizer)} className={player.isOrganizer ? 'text-yellow-500' : 'text-slate-300 hover:text-yellow-500'}><Crown size={14}/></button>
+                                            <button onClick={() => confirm(`${player.name}をキックしますか？`) && kickPlayer(player.id)} className="text-slate-300 hover:text-red-600"><Trash2 size={14}/></button>
                                         </td>
                                     </tr>
-                                    );
-                                })
-                                )}
+                                ))}
                             </tbody>
                         </table>
                     ) : (
-                        <table className="w-full text-left border-collapse">
-                            <thead className="bg-slate-50 sticky top-0 text-xs uppercase text-slate-500 z-10">
-                                <tr>
-                                <th className="p-3 w-10">#</th>
-                                <th className="p-3">問題文</th>
-                                <th className="p-3">正解</th>
-                                <th className="p-3">画像</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 text-sm">
-                                {state.questions.length === 0 ? (
-                                <tr><td colSpan={4} className="p-8 text-center text-slate-400">問題データがありません</td></tr>
-                                ) : (
-                                state.questions.map((q, index) => {
-                                    const hasQImage = q.questionImage;
-                                    const hasOptImage = q.optionImages && q.optionImages.some(i => i);
-                                    return (
-                                    <tr key={index} className="hover:bg-slate-50">
-                                        <td className="p-3 text-slate-400">{index + 1}</td>
-                                        <td className="p-3">
-                                            <div className="font-bold text-slate-700 line-clamp-2">{q.text}</div>
-                                            <div className="text-xs text-slate-400 mt-1">
-                                                {q.options.join(', ')}
-                                            </div>
-                                        </td>
-                                        <td className="p-3 font-mono text-green-600">{q.options[q.correctIndex]}</td>
-                                        <td className="p-3">
-                                            <div className="flex flex-col gap-1">
-                                                {hasQImage ? <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1 rounded inline-block w-fit">問画像あり</span> : <span className="text-[10px] text-slate-300">-</span>}
-                                                {hasOptImage ? <span className="text-[10px] bg-blue-100 text-blue-700 px-1 rounded inline-block w-fit">選画像あり</span> : <span className="text-[10px] text-slate-300">-</span>}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    );
-                                })
-                                )}
-                            </tbody>
-                        </table>
+                        <div className="p-4 space-y-2">
+                            {state.questions.map((q, i) => (
+                                <div key={i} className="text-xs border-b pb-1">
+                                    <span className="text-slate-400 mr-2">{i+1}.</span>
+                                    <span className="font-bold">{q.text}</span>
+                                    <span className="text-green-600 ml-2">({q.options[q.correctIndex]})</span>
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </div>
-                {activeTab === 'PLAYERS' && (
-                    <div className="p-3 border-t border-slate-200 bg-slate-50 text-xs text-slate-500 flex justify-between">
-                        <span>回答率: {Math.round((answeredCount / (Array.isArray(state.players) && state.players.length > 0 ? state.players.length : 1)) * 100)}%</span>
-                    </div>
-                )}
             </div>
         </div>
       </main>
 
       <div className="fixed bottom-0 left-0 right-0 h-24 bg-black text-green-400 p-2 font-mono text-[10px] overflow-y-auto border-t-2 border-green-700 z-50 opacity-80">
-          <div className="flex items-center gap-2 mb-1 sticky top-0 bg-black/90 p-1 border-b border-green-900">
-              <Terminal size={12}/> System Logs
-          </div>
-          {debugError && <div className="text-red-500 bg-red-900/50 p-1 mb-1">{debugError}</div>}
-          {logs.length === 0 && <span className="opacity-50">No logs...</span>}
-          {logs.map((log, i) => (
-              <div key={i}>{log}</div>
-          ))}
+          {logs.map((log, i) => <div key={i}>{log}</div>)}
       </div>
     </div>
   );
