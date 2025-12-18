@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuizQuestion } from "../types";
 
@@ -5,8 +6,9 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateQuizQuestions = async (topic: string, count: number = 5): Promise<QuizQuestion[]> => {
   try {
+    // Using gemini-3-flash-preview for text-based quiz generation as per task type guidelines
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: `Create a fun and engaging multiple-choice quiz about "${topic}" in Japanese. 
       Generate ${count} questions. 
       Ensure the questions are suitable for a general audience.
