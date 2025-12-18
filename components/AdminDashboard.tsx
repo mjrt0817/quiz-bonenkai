@@ -442,11 +442,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         <FileSpreadsheet size={20}/> サンプルスプレッドシート
                                     </p>
                                     <p className="text-sm text-indigo-800/80 leading-relaxed">
-                                        以下のテンプレートをコピー（ファイル {'->'} コピーを作成）して、ご自身の問題を作成してください。作成後、共有設定を「リンクを知っている全員」に変更したURLをコピーして管理画面に貼り付けます。
+                                        以下のテンプレートをコピー（ファイル → コピーを作成）して、ご自身の問題を作成してください。作成後、共有設定を「リンクを知っている全員」に変更したURLをコピーして管理画面に貼り付けます。
                                     </p>
                                 </div>
                                 <a 
-                                    href="https://docs.google.com/spreadsheets/d/1RozpHh9965r7qz4RsjWgOSKYfQnsSNkqI0Jua1ElfTs/edit?usp=sharing"
+                                    href="https://docs.google.com/spreadsheets/d/1RozpHh9965r7qz4RsjWgOSKYfQnsSNkqI0Jua1ElfTs/edit?usp=sharing" 
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                     className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-700 transition flex items-center gap-2 whitespace-nowrap"
@@ -674,7 +674,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {soundSlots.map((slot, index) => (
                     <div key={slot.id} className={`border rounded-lg p-2 flex flex-col gap-2 ${slot.isPlaying ? 'border-green-400 bg-green-50' : 'bg-slate-50'}`}>
                         <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
-                           <span>Slot #{slot.id}</span>
+                           <span className="truncate mr-1" title={`Slot #${slot.id}: ${slot.file?.name || '未設定'}`}>
+                             Slot #{slot.id}
+                           </span>
                            <button onClick={() => toggleLoop(index)} className={slot.isLoop ? 'text-indigo-600' : 'text-slate-300'}><Repeat size={12}/></button>
                         </div>
                         {!slot.url ? (
@@ -683,10 +685,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleFileSelect(index, e)}/>
                            </label>
                         ) : (
-                           <div className="flex gap-1 justify-center">
-                              <button onClick={() => togglePlaySound(index)} className={`p-2 rounded-full text-white ${slot.isPlaying ? 'bg-orange-500' : 'bg-green-600'}`}>{slot.isPlaying ? <RotateCcw size={12}/> : <Play size={12}/>}</button>
-                              {slot.isPlaying && <button onClick={() => stopSound(index)} className="p-2 bg-red-600 text-white rounded-full"><StopCircle size={12}/></button>}
-                           </div>
+                           <>
+                             <div className="flex gap-1 justify-center">
+                                <button onClick={() => togglePlaySound(index)} className={`p-2 rounded-full text-white ${slot.isPlaying ? 'bg-orange-500' : 'bg-green-600'}`}>{slot.isPlaying ? <RotateCcw size={12}/> : <Play size={12}/>}</button>
+                                {slot.isPlaying && <button onClick={() => stopSound(index)} className="p-2 bg-red-600 text-white rounded-full"><StopCircle size={12}/></button>}
+                             </div>
+                             <div className="text-[9px] text-slate-500 text-center truncate px-1 mt-1" title={slot.file?.name || ''}>
+                               {slot.file?.name}
+                             </div>
+                           </>
                         )}
                     </div>
                   ))}
