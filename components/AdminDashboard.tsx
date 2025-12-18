@@ -39,7 +39,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [customTimeLimit, setCustomTimeLimit] = useState(20);
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
-  const [debugError, setDebugError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'PLAYERS' | 'QUIZ'>('PLAYERS');
   const [isManualOpen, setIsManualOpen] = useState(false);
 
@@ -128,11 +127,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         console.error("Sort error", e);
         return [];
     }
-  }, [state.players]);
-
-  const answeredCount = useMemo(() => {
-    const list = Array.isArray(state.players) ? state.players : [];
-    return list.filter(p => p && p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined).length;
   }, [state.players]);
 
   const handleFileSelect = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -448,7 +442,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                         <FileSpreadsheet size={20}/> サンプルスプレッドシート
                                     </p>
                                     <p className="text-sm text-indigo-800/80 leading-relaxed">
-                                        以下のテンプレートをコピー（ファイル > コピーを作成）して、ご自身の問題を作成してください。作成後、共有設定を「リンクを知っている全員」に変更したURLをコピーして管理画面に貼り付けます。
+                                        以下のテンプレートをコピー（ファイル {'->'} コピーを作成）して、ご自身の問題を作成してください。作成後、共有設定を「リンクを知っている全員」に変更したURLをコピーして管理画面に貼り付けます。
                                     </p>
                                 </div>
                                 <a 
