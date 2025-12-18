@@ -36,7 +36,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [csvUrl, setCsvUrl] = useState('');
   const [titleInput, setTitleInput] = useState(state.quizTitle || 'クイズ大会');
   const [imageUrlInput, setImageUrlInput] = useState('');
-  const [customTimeLimit, setCustomTimeLimit] = useState(20);
+  const [customTimeLimit, setCustomTimeLimit] = useState(state.timeLimit || 20);
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'PLAYERS' | 'QUIZ'>('PLAYERS');
@@ -313,7 +313,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     updateState(prev => {
       const nextIndex = prev.currentQuestionIndex + 1;
       if (nextIndex >= prev.questions.length) return { ...prev, gameState: GameState.FINAL_RESULT, rankingRevealStage: 0 };
-      return { ...prev, currentQuestionIndex: nextIndex, gameState: GameState.PLAYING_QUESTION, isTimerRunning: false };
+      return { ...prev, currentQuestionIndex: nextIndex, gameState: GameState.PLAYING_QUESTION, isTimerRunning: false, timeLimit: customTimeLimit };
     });
     playIntroSound();
   };
@@ -605,6 +605,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-indigo-500">
               <h2 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-700"><Play size={20}/> 進行コントロール</h2>
               <div className="space-y-4">
+                {/* 制限時間設定 UI */}
+                <div className="space-y-1 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                  <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                    <Clock size={12}/> 制限時間 (秒)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="number" 
+                      value={customTimeLimit} 
+                      onChange={(e) => setCustomTimeLimit(Number(e.target.value))} 
+                      className="w-full px-3 py-1.5 border rounded text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"
+                      min="1"
+                      max="300"
+                    />
+                    <span className="text-xs text-slate-400 font-bold shrink-0">秒</span>
+                  </div>
+                </div>
+
                 <div className="text-center p-4 bg-slate-50 rounded mb-4">
                    <div className="text-xs text-slate-500 uppercase">第 {state.currentQuestionIndex + 1} 問</div>
                    <div className="text-sm font-bold truncate">{currentQ.text}</div>
