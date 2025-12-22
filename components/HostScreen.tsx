@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
-import { Users, CheckCircle, Sparkles, Monitor, Medal, Trophy, AlertTriangle, Image as ImageIcon, Crown } from 'lucide-react';
+import { Users, CheckCircle, Sparkles, Monitor, Medal, Trophy, AlertTriangle, Image as ImageIcon, Crown, Clock, Zap, Info, ShieldAlert } from 'lucide-react';
 
 interface HostScreenProps {
   state: HostState;
@@ -19,7 +20,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
 
   useEffect(() => {
     let timerId: any;
-    // Only count down if timer is officially running
     if (state.gameState === GameState.PLAYING_QUESTION && state.isTimerRunning && state.questionStartTime) {
       timerId = setInterval(() => {
         const elapsedSeconds = (Date.now() - (state.questionStartTime || 0)) / 1000;
@@ -28,8 +28,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
         if (remaining <= 0) clearInterval(timerId);
       }, 100);
     } else {
-      // If timer is NOT running, show full time or 0 depending on state?
-      // Usually full time is better to show "ready"
       if (state.gameState === GameState.PLAYING_QUESTION) {
          setTimeLeft(state.timeLimit);
       } else {
@@ -44,10 +42,8 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   const isFinalQuestion = state.questions.length > 0 && state.currentQuestionIndex === state.questions.length - 1;
 
   const sortedPlayers = [...state.players].sort((a, b) => {
-      // Organizer sort: Organizers go to the bottom
       if (a.isOrganizer && !b.isOrganizer) return 1;
       if (!a.isOrganizer && b.isOrganizer) return -1;
-
       if (b.score !== a.score) return b.score - a.score;
       return (a.totalResponseTime || 0) - (b.totalResponseTime || 0);
   });
@@ -55,29 +51,20 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
   const isTitleOnlyMode = (state.gameState === GameState.LOBBY || state.gameState === GameState.SETUP) && !state.isLobbyDetailsVisible;
   const currentQuestion = state.questions[state.currentQuestionIndex];
   
-  // Robust Image Error Handler
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const img = e.currentTarget;
     const currentSrc = img.src;
-
-    // 1. If currently using lh3 format, try falling back to standard drive uc format
     if (currentSrc.includes('lh3.googleusercontent.com/d/')) {
-        // Only retry once
         if (img.dataset.retried === 'true') {
              img.style.display = 'none';
              showFallback(img);
              return;
         }
         img.dataset.retried = 'true';
-        
         const id = currentSrc.split('/').pop();
-        if (id) {
-            img.src = `https://drive.google.com/uc?export=view&id=${id}`;
-        }
+        if (id) img.src = `https://drive.google.com/uc?export=view&id=${id}`;
         return;
     }
-
-    // 2. If it was already standard drive format or other, show fallback
     img.style.display = 'none';
     showFallback(img);
   };
@@ -91,6 +78,57 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
         parent.appendChild(fallback);
      }
   };
+
+  // ルール案内コンポーネント
+  const RulesOverlay = () => (
+    <div className="absolute bottom-10 inset-x-0 flex justify-center px-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-500 fill-mode-both">
+        <div className="bg-slate-900/60 backdrop-blur-xl border border-white/20 p-6 rounded-[2.5rem] flex items-center gap-10 shadow-2xl max-w-6xl w-full">
+            <div className="flex items-center gap-3 shrink-0">
+                <div className="bg-indigo-600 p-2 rounded-xl text-white">
+                    <Info size={24} />
+                </div>
+                <div className="text-left">
+                    <div className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Rule Guide</div>
+                    <div className="text-lg font-black text-white">クイズのルール</div>
+                </div>
+            </div>
+            
+            <div className="h-10 w-px bg-white/10 shrink-0"></div>
+            
+            <div className="flex-1 grid grid-cols-3 gap-8">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-green-500/20 border border-green-500/50 flex items-center justify-center text-green-400 shrink-0">
+                        <Sparkles size={20} />
+                    </div>
+                    <div className="text-left">
+                        <div className="text-[10px] font-bold text-slate-400">SCORE</div>
+                        <div className="text-sm font-bold text-white leading-tight">正解で10ポイント獲得</div>
+                    </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-orange-500/20 border border-orange-500/50 flex items-center justify-center text-orange-400 shrink-0">
+                        <Zap size={20} />
+                    </div>
+                    <div className="text-left">
+                        <div className="text-[10px] font-bold text-slate-400">TIE-BREAKER</div>
+                        <div className="text-sm font-bold text-white leading-tight">同点は回答スピード順</div>
+                    </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-500/50 flex items-center justify-center text-blue-400 shrink-0">
+                        <ShieldAlert size={20} />
+                    </div>
+                    <div className="text-left">
+                        <div className="text-[10px] font-bold text-slate-400">CAUTION</div>
+                        <div className="text-sm font-bold text-white leading-tight">合図が出るまでボタンは出ません</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  );
 
   return (
     <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
@@ -147,10 +185,12 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                             <p className="text-2xl text-slate-400 font-bold uppercase tracking-[0.5em]">Coming Soon</p>
                          </div>
                      )}
+                     
+                     {/* ルール案内のオーバーレイ */}
+                     <RulesOverlay />
                 </div>
             ) : (
                 <div className="w-full h-full flex flex-col items-center justify-start pt-6 p-6">
-                    
                     {state.titleImage ? (
                         <div className="mb-4 max-h-[100px] flex justify-center">
                             <img src={state.titleImage} alt="Tournament Title" className="h-full object-contain drop-shadow-lg" />
@@ -263,7 +303,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                                     onError={handleImageError}
                                 />
                             </div>
-                            {/* 画像がある場合はテキストは不要、もしくは小さく表示 */}
                             {opt && (
                                 <div className="w-full bg-black/60 py-1 text-center font-bold text-lg backdrop-blur-sm shrink-0 absolute bottom-0 left-0">
                                     {opt}
@@ -331,9 +370,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                         <p className="text-xl text-yellow-100/60 font-light tracking-[0.5em] uppercase">Tournament Results</p>
                     </div>
 
-                    {/* TOP 3 PODIUM */}
                     <div className="flex justify-center items-end gap-4 h-[50vh] mb-8 px-4 relative">
-                        {/* 2nd Place */}
                         <div className={`w-1/3 max-w-[280px] flex flex-col justify-end transition-all duration-1000 ${state.isRankingResultVisible && state.rankingRevealStage >= 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}`}>
                              <div className="text-center mb-2">
                                 <div className="text-3xl font-bold text-slate-300 drop-shadow-lg mb-1">{state.isRankingResultVisible ? sortedPlayers[1]?.name : '???'}</div>
@@ -345,7 +382,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                              </div>
                         </div>
 
-                        {/* 1st Place */}
                         <div className={`w-1/3 max-w-[320px] flex flex-col justify-end z-10 -mx-2 transition-all duration-1000 delay-300 ${state.isRankingResultVisible && state.rankingRevealStage >= 3 ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-20 scale-95'}`}>
                              <div className="text-center mb-4">
                                 <div className="relative inline-block">
@@ -360,7 +396,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                              </div>
                         </div>
 
-                        {/* 3rd Place */}
                         <div className={`w-1/3 max-w-[280px] flex flex-col justify-end transition-all duration-1000 ${state.isRankingResultVisible && state.rankingRevealStage >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}`}>
                              <div className="text-center mb-2">
                                 <div className="text-3xl font-bold text-amber-600 drop-shadow-lg mb-1">{state.isRankingResultVisible ? sortedPlayers[2]?.name : '???'}</div>
@@ -373,7 +408,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                         </div>
                     </div>
 
-                    {/* Lower Ranks Grid (Optional) */}
                     {!state.hideBelowTop3 && sortedPlayers.length > 3 && (
                         <div className="bg-slate-800/80 backdrop-blur-sm rounded-xl p-4 border border-slate-700 max-h-[25vh] overflow-y-auto">
                             <h3 className="text-center text-slate-400 text-sm font-bold uppercase mb-4 sticky top-0 bg-slate-800 py-2">Runner Ups</h3>
