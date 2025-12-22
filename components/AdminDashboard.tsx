@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz, convertToDirectLink } from '../services/csvService';
@@ -7,7 +8,7 @@ import {
   Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, 
   Terminal, Monitor, Link, Timer, Crown, FastForward, HelpCircle, 
   CheckCircle2, AlertCircle, BookOpen, Smartphone, FileSpreadsheet, ExternalLink,
-  Info, Zap, ShieldAlert, ListChecks, Users2, Megaphone, Mic2, MessageSquare
+  Info, Zap, ShieldAlert, ListChecks, Users2, Megaphone, Mic2, MessageSquare, AlertTriangle
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -37,7 +38,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [csvUrl, setCsvUrl] = useState('');
   const [titleInput, setTitleInput] = useState(state.quizTitle || 'クイズ大会');
   const [imageUrlInput, setImageUrlInput] = useState('');
-  const [customTimeLimit, setCustomTimeLimit] = useState(state.timeLimit || 20);
+  const [customTimeLimit, setCustomTimeLimit] = useState(state.timeLimit || 15); // 20から15に変更
   const [isLoading, setIsLoading] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'PLAYERS' | 'QUIZ'>('PLAYERS');
@@ -65,6 +66,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const mainThinkingAudioRef = useRef<HTMLAudioElement | null>(null);
   const thinkingAudioRef = useRef<HTMLAudioElement | null>(null);
   const hasTriggeredCountdownRef = useRef(false);
+
+  // 音響設定が完了しているかどうかの判定
+  const isSoundConfigured = useMemo(() => {
+    return !!introSound.url && !!mainThinkingSound.url && !!thinkingSound.url;
+  }, [introSound.url, mainThinkingSound.url, thinkingSound.url]);
 
   useEffect(() => {
     return () => {
@@ -230,6 +236,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const startGame = () => {
+    if (!isSoundConfigured) return; // 音響未設定時は実行不可
     resetPlayerScores();
     hasTriggeredCountdownRef.current = false;
     updateState(prev => ({ ...prev, currentQuestionIndex: 0, gameState: GameState.PLAYING_QUESTION, isTimerRunning: false, timeLimit: customTimeLimit }));
@@ -536,7 +543,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="flex items-center gap-2"><input type="number" value={customTimeLimit} onChange={(e) => setCustomTimeLimit(Number(e.target.value))} className="w-full px-3 py-1.5 border rounded text-sm font-bold" min="1"/><span className="text-xs text-slate-400 font-bold">秒</span></div>
                 </div>
                 <div className="text-center p-4 bg-slate-50 rounded mb-4"><div className="text-xs text-slate-500 uppercase">第 {state.currentQuestionIndex + 1} 問</div><div className="text-sm font-bold truncate">{currentQ.text}</div></div>
-                {state.gameState === GameState.LOBBY && <button onClick={startGame} className="w-full bg-green-600 text-white py-4 rounded-lg font-bold text-xl shadow">クイズ開始</button>}
+                
+                {state.gameState === GameState.LOBBY && (
+                  <div className="space-y-3">
+                    {!isSoundConfigured && (
+                      <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                        <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={16}/>
+                        <p className="text-[10px] text-amber-800 font-bold leading-tight">
+                          クイズを開始するには、右の音響設定パネルから「問題表示時SE」「メインBGM」「カウントダウンBGM」をすべて設定してください。
+                        </p>
+                      </div>
+                    )}
+                    <button 
+                      onClick={startGame} 
+                      disabled={!isSoundConfigured}
+                      className={`w-full py-4 rounded-lg font-bold text-xl shadow transition-all duration-300 ${isSoundConfigured ? 'bg-green-600 text-white hover:bg-green-700 active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'}`}
+                    >
+                      クイズ開始
+                    </button>
+                  </div>
+                )}
+                
                 {state.gameState === GameState.PLAYING_QUESTION && (
                   <div className="space-y-3">
                       {!state.isTimerRunning ? <button onClick={startTimer} className="w-full bg-orange-600 text-white py-4 rounded-lg font-bold text-xl shadow animate-pulse"><Timer size={24}/> タイマースタート</button> : <div className="w-full bg-slate-100 text-slate-500 py-2 rounded-lg text-center text-sm font-bold">シンキングタイム中...</div>}
@@ -602,21 +629,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                <div className="p-4 border-b border-slate-200 flex items-center gap-2"><Music size={20} className="text-indigo-600"/><h2 className="font-bold text-lg text-slate-700">効果音 / BGM</h2></div>
                <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col gap-4">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-500">問題表示時SE</label>
+                        <div className={`space-y-2 p-2 rounded-lg border transition-colors ${!introSound.url ? 'bg-red-50 border-red-200 shadow-[0_0_10px_rgba(239,68,68,0.1)]' : 'border-slate-100'}`}>
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                                問題表示時SE {!introSound.url && <span className="text-red-500 font-black">*必須</span>}
+                            </label>
                             <input type="file" accept="audio/*" onChange={handleIntroSoundSelect} className="text-xs block w-full border rounded p-1 bg-white" />
                         </div>
-                        <div className="space-y-2">
+                        <div className={`space-y-2 p-2 rounded-lg border transition-colors ${!mainThinkingSound.url ? 'bg-red-50 border-red-200 shadow-[0_0_10px_rgba(239,68,68,0.1)]' : 'border-slate-100'}`}>
                             <div className="flex justify-between items-center">
-                                <label className="text-xs font-bold text-slate-500">メインBGM (〜残り6秒)</label>
+                                <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                                    メインBGM {!mainThinkingSound.url && <span className="text-red-500 font-black">*必須</span>}
+                                </label>
                                 <button onClick={toggleMainThinkingLoop} className={`px-2 py-0.5 rounded text-[10px] ${isMainThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200'}`}>Loop: {isMainThinkingLoop ? 'ON' : 'OFF'}</button>
                             </div>
                             <input type="file" accept="audio/*" onChange={handleMainThinkingSoundSelect} className="text-xs block w-full border rounded p-1 bg-white" />
                         </div>
                    </div>
-                   <div className="space-y-2 border-t pt-2">
+                   <div className={`space-y-2 p-2 rounded-lg border transition-colors ${!thinkingSound.url ? 'bg-red-50 border-red-200 shadow-[0_0_10px_rgba(239,68,68,0.1)]' : 'border-slate-100'}`}>
                        <div className="flex justify-between items-center">
-                            <label className="text-xs font-bold text-slate-500">カウントダウンBGM (残り6秒〜)</label>
+                            <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                                カウントダウンBGM {!thinkingSound.url && <span className="text-red-500 font-black">*必須</span>}
+                            </label>
                             <button onClick={toggleThinkingLoop} className={`px-2 py-0.5 rounded text-[10px] ${isThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200'}`}>Loop: {isThinkingLoop ? 'ON' : 'OFF'}</button>
                        </div>
                        <input type="file" accept="audio/*" onChange={handleThinkingSoundSelect} className="text-xs block w-full border rounded p-1 bg-white" />
