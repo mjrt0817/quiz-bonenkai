@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { db } from '../services/firebaseConfig';
@@ -10,7 +11,7 @@ const INITIAL_HOST_STATE: HostState = {
   questions: [],
   players: [],
   roomCode: 'EVENT',
-  timeLimit: 20,
+  timeLimit: 15, // 20から15に変更
   questionStartTime: null,
   isTimerRunning: false,
   rankingRevealStage: 0,
