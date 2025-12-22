@@ -272,6 +272,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const revealStage = () => updateState(prev => ({ ...prev, isRankingResultVisible: true }));
   const toggleHideBelowTop3 = () => updateState(prev => ({ ...prev, hideBelowTop3: !prev.hideBelowTop3 }));
   const toggleLobbyDetails = () => updateState(prev => ({ ...prev, isLobbyDetailsVisible: !prev.isLobbyDetailsVisible }));
+  const toggleRules = () => updateState(prev => ({ ...prev, isRulesVisible: !prev.isRulesVisible }));
 
   const resetGame = () => {
     updateState(prev => ({ ...prev, gameState: GameState.SETUP, questions: [], isTimerRunning: false }));
@@ -501,9 +502,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {(state.gameState === GameState.SETUP || state.gameState === GameState.LOBBY) && (
             <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
                <h2 className="font-bold text-lg mb-3 text-slate-700 flex items-center gap-2"><Monitor size={20}/> 画面表示</h2>
-               <button onClick={toggleLobbyDetails} className={`w-full py-3 rounded-lg font-bold text-sm border flex items-center justify-center gap-2 transition ${state.isLobbyDetailsVisible ? 'bg-slate-100 text-slate-700' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
-                   {state.isLobbyDetailsVisible ? <ImageIcon size={18}/> : <QrCode size={18}/>} {state.isLobbyDetailsVisible ? 'タイトル画像モードへ' : 'QR・参加者モードへ'}
-               </button>
+               <div className="space-y-2">
+                  <button onClick={toggleLobbyDetails} className={`w-full py-3 rounded-lg font-bold text-sm border flex items-center justify-center gap-2 transition ${state.isLobbyDetailsVisible ? 'bg-slate-100 text-slate-700' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
+                      {state.isLobbyDetailsVisible ? <ImageIcon size={18}/> : <QrCode size={18}/>} {state.isLobbyDetailsVisible ? 'タイトル画像モードへ' : 'QR・参加者モードへ'}
+                  </button>
+                  <button onClick={toggleRules} className={`w-full py-3 rounded-lg font-bold text-sm border flex items-center justify-center gap-2 transition ${state.isRulesVisible ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border-indigo-600'}`}>
+                      <Info size={18}/> {state.isRulesVisible ? 'ルール案内を隠す' : '回答ルール案内を表示'}
+                  </button>
+               </div>
             </div>
           )}
 
