@@ -1,8 +1,7 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { db } from '../services/firebaseConfig';
-// Using firebase/compat/database via db instance instead of modular imports
-// import { ref, set, onValue, update, remove, get } from 'firebase/database';
 
 const ROOM_ID = 'party-room-2024';
 
@@ -28,16 +27,11 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
   const [playerId, setPlayerId] = useState(() => localStorage.getItem('quiz_player_id') || '');
   const [joinError, setJoinError] = useState<string | null>(null);
 
-  // --- SYNC STATE (ALL ROLES) ---
   useEffect(() => {
-    // Subscribe to global state
     const stateRef = db.ref(`rooms/${ROOM_ID}/state`);
-    
     const handleStateChange = (snapshot: any) => {
       const data = snapshot.val();
       if (data) {
-        // Ensure players is always an array, even if Firebase returns an object map
-        // AND clean up null/undefined values to prevent crashes
         let safePlayers: Player[] = [];
         if (Array.isArray(data.players)) {
             safePlayers = data.players.filter((p: any) => p && typeof p === 'object');
@@ -52,32 +46,20 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
             players: safePlayers
         });
       } else if (role === 'HOST' || role === 'ADMIN') {
-        // If no state exists and we are host/admin, initialize it
         stateRef.set(INITIAL_HOST_STATE);
       }
     };
-
     stateRef.on('value', handleStateChange);
     
-    // Subscribe to players list separately for realtime updates
     const playersRef = db.ref(`rooms/${ROOM_ID}/players`);
-    
     const handlePlayersChange = (snap: any) => {
       const playersObj = snap.val() || {};
-      // Also filter nulls here
       const playersList = (Object.values(playersObj) as Player[]).filter(p => p && typeof p === 'object');
-      
-      // Update local state with latest players
       setHostState(prev => ({ ...prev, players: playersList }));
-      
-      // HOST/ADMIN responsibility: Keep the 'state.players' in sync with 'players' node
-      // This ensures redundancy and consistency
       if (role === 'HOST' || role === 'ADMIN') {
-         const statePlayersRef = db.ref(`rooms/${ROOM_ID}/state/players`);
-         statePlayersRef.set(playersList).catch((err: any) => console.error("Sync players failed", err));
+         db.ref(`rooms/${ROOM_ID}/state/players`).set(playersList);
       }
     };
-
     playersRef.on('value', handlePlayersChange);
 
     return () => {
@@ -86,55 +68,36 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     };
   }, [role]);
 
-
-  // --- ADMIN / HOST ACTIONS ---
-  
   const updateHostState = useCallback((updater: (prev: HostState) => HostState) => {
     if (role !== 'HOST' && role !== 'ADMIN') return;
-
     setHostState(prev => {
       const newState = updater(prev);
-      const stateRef = db.ref(`rooms/${ROOM_ID}/state`);
-      
-      // Sanitize newState before sending to Firebase to remove undefined values
-      // JSON.stringify removes keys with undefined values, which fixes the "value argument contains undefined" error
       const sanitizedState = JSON.parse(JSON.stringify(newState));
-      
-      stateRef.set(sanitizedState).catch((err: any) => console.error("Firebase update failed", err));
+      db.ref(`rooms/${ROOM_ID}/state`).set(sanitizedState);
       return newState;
     });
   }, [role]);
 
   const resetPlayerAnswers = useCallback(async () => {
     if (role !== 'HOST' && role !== 'ADMIN') return;
-    if (hostState.players.length === 0) return;
-    
     const updates: any = {};
     hostState.players.forEach(p => {
-        if(p && p.id) {
-           updates[`rooms/${ROOM_ID}/players/${p.id}/lastAnswerIndex`] = null;
-        }
+        if(p?.id) updates[`rooms/${ROOM_ID}/players/${p.id}/lastAnswerIndex`] = null;
     });
-    if (Object.keys(updates).length > 0) {
-        await db.ref().update(updates);
-    }
+    if (Object.keys(updates).length > 0) await db.ref().update(updates);
   }, [role, hostState.players]);
 
   const resetPlayerScores = useCallback(async () => {
     if (role !== 'HOST' && role !== 'ADMIN') return;
-    if (hostState.players.length === 0) return;
-
     const updates: any = {};
     hostState.players.forEach(p => {
-        if(p && p.id) {
+        if(p?.id) {
             updates[`rooms/${ROOM_ID}/players/${p.id}/score`] = 0;
             updates[`rooms/${ROOM_ID}/players/${p.id}/lastAnswerIndex`] = null;
             updates[`rooms/${ROOM_ID}/players/${p.id}/totalResponseTime`] = 0;
         }
     });
-    if (Object.keys(updates).length > 0) {
-        await db.ref().update(updates);
-    }
+    if (Object.keys(updates).length > 0) await db.ref().update(updates);
   }, [role, hostState.players]);
 
   const calculateAndSaveScores = useCallback(async () => {
@@ -146,19 +109,18 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     const updates: any = {};
     
     hostState.players.forEach(p => {
-      if(!p || !p.id) return;
+      if(!p?.id) return;
 
-      // Calculate Time Difference (Tie Breaker)
-      if (p.lastAnswerIndex !== null && p.lastAnswerIndex !== undefined && p.lastAnswerTime && questionStartTime) {
-          const timeTaken = Math.max(0, p.lastAnswerTime - questionStartTime);
-          const currentTotal = p.totalResponseTime || 0;
-          updates[`rooms/${ROOM_ID}/players/${p.id}/totalResponseTime`] = currentTotal + timeTaken;
-      }
-
-      // Calculate Score
+      // 正解した場合のみスコア加算とタイム記録を行う
       if (p.lastAnswerIndex === currentQ.correctIndex) {
-         const newScore = (p.score || 0) + 10; // 10 points per correct answer
+         const newScore = (p.score || 0) + 10;
          updates[`rooms/${ROOM_ID}/players/${p.id}/score`] = newScore;
+
+         // 正解者の回答スピードを累積（タイマースタートからのミリ秒）
+         if (p.lastAnswerTime && questionStartTime) {
+            const timeTaken = Math.max(0, p.lastAnswerTime - questionStartTime);
+            updates[`rooms/${ROOM_ID}/players/${p.id}/totalResponseTime`] = (p.totalResponseTime || 0) + timeTaken;
+         }
       }
     });
 
@@ -167,9 +129,9 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     }
   }, [role, hostState.players, hostState.questions, hostState.currentQuestionIndex, hostState.questionStartTime]);
 
-  const kickPlayer = useCallback(async (targetPlayerId: string) => {
+  const kickPlayer = useCallback(async (id: string) => {
     if (role !== 'HOST' && role !== 'ADMIN') return;
-    await db.ref(`rooms/${ROOM_ID}/players/${targetPlayerId}`).remove();
+    await db.ref(`rooms/${ROOM_ID}/players/${id}`).remove();
   }, [role]);
 
   const resetAllPlayers = useCallback(async () => {
@@ -177,86 +139,45 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     await db.ref(`rooms/${ROOM_ID}/players`).remove();
   }, [role]);
   
-  const toggleOrganizer = useCallback(async (targetPlayerId: string, currentState: boolean) => {
+  const toggleOrganizer = useCallback(async (id: string, current: boolean) => {
       if (role !== 'HOST' && role !== 'ADMIN') return;
-      await db.ref(`rooms/${ROOM_ID}/players/${targetPlayerId}`).update({
-          isOrganizer: !currentState
-      });
+      await db.ref(`rooms/${ROOM_ID}/players/${id}`).update({ isOrganizer: !current });
   }, [role]);
-
-
-  // --- PLAYER ACTIONS ---
 
   const joinGame = useCallback(async (name: string) => {
     if (role !== 'PLAYER') return false;
-    setJoinError(null);
-    
-    // Check existing players
     const playersRef = db.ref(`rooms/${ROOM_ID}/players`);
     const snapshot = await playersRef.once('value');
-    const playersObj = snapshot.val() || {};
-    const playersList = (Object.values(playersObj) as Player[]).filter(p => p);
-    
-    const existingPlayer = playersList.find(p => p && p.name === name);
+    const playersList = Object.values(snapshot.val() || {}) as Player[];
+    const existingPlayer = playersList.find(p => p?.name === name);
 
     let targetId = playerId;
-
     if (existingPlayer) {
-      // RECOVERY LOGIC
       targetId = existingPlayer.id;
       setPlayerId(targetId);
       localStorage.setItem('quiz_player_id', targetId);
-      
-      const playerRef = db.ref(`rooms/${ROOM_ID}/players/${targetId}`);
-      playerRef.update({ isOnline: true });
+      db.ref(`rooms/${ROOM_ID}/players/${targetId}`).update({ isOnline: true });
     } else {
-      // NEW PLAYER
       if (!targetId) {
         targetId = `p-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
         setPlayerId(targetId);
         localStorage.setItem('quiz_player_id', targetId);
       }
-      
       const player: Player = {
-        id: targetId,
-        name,
-        score: 0,
-        lastAnswerIndex: null,
-        lastAnswerTime: 0,
-        totalResponseTime: 0,
-        isOnline: true,
-        isOrganizer: false
+        id: targetId, name, score: 0, lastAnswerIndex: null, lastAnswerTime: 0, totalResponseTime: 0, isOnline: true, isOrganizer: false
       };
-      const playerRef = db.ref(`rooms/${ROOM_ID}/players/${targetId}`);
-      await playerRef.set(player);
+      await db.ref(`rooms/${ROOM_ID}/players/${targetId}`).set(player);
     }
     return true;
   }, [role, playerId]);
 
   const submitAnswer = useCallback((index: number) => {
     if (role !== 'PLAYER') return;
-    
-    const answerRef = db.ref(`rooms/${ROOM_ID}/players/${playerId}/lastAnswerIndex`);
-    const timeRef = db.ref(`rooms/${ROOM_ID}/players/${playerId}/lastAnswerTime`);
-    
-    // Player just sends their timestamp. The host will calculate the duration relative to question start.
-    answerRef.set(index);
-    timeRef.set(Date.now());
+    db.ref(`rooms/${ROOM_ID}/players/${playerId}`).update({
+      lastAnswerIndex: index,
+      lastAnswerTime: Date.now()
+    });
   }, [role, playerId]);
 
-
-  return {
-    hostState,
-    playerId,
-    joinError,
-    updateHostState,
-    joinGame,
-    submitAnswer,
-    resetPlayerAnswers,
-    resetPlayerScores,
-    calculateAndSaveScores,
-    kickPlayer,
-    resetAllPlayers,
-    toggleOrganizer
-  };
+  return { hostState, playerId, joinError, updateHostState, joinGame, submitAnswer, resetPlayerAnswers, resetPlayerScores, calculateAndSaveScores, kickPlayer, resetAllPlayers, toggleOrganizer };
 };
