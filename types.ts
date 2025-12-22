@@ -42,6 +42,7 @@ export interface HostState {
   quizTitle: string; // Tournament Title
   titleImage?: string | null; // Base64 image data for the lobby screen
   isLobbyDetailsVisible: boolean; // Controls if QR/Players are shown in lobby or just the title image
+  isRulesVisible: boolean; // 全画面ルール案内の表示フラグ
 }
 
 export const COLORS = [
