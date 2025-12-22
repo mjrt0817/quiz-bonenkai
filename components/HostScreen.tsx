@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
-import { Users, CheckCircle, Sparkles, Monitor, Medal, Trophy, AlertTriangle, Image as ImageIcon, Crown, Clock, Zap, Info, ShieldAlert } from 'lucide-react';
+// Added Smartphone to the imports from lucide-react to fix the "Cannot find name 'Smartphone'" error
+import { Users, CheckCircle, Sparkles, Monitor, Medal, Trophy, AlertTriangle, Image as ImageIcon, Crown, Clock, Zap, Info, ShieldAlert, Smartphone } from 'lucide-react';
 
 interface HostScreenProps {
   state: HostState;
@@ -79,60 +80,81 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
      }
   };
 
-  // ルール案内コンポーネント
-  const RulesOverlay = () => (
-    <div className="absolute bottom-10 inset-x-0 flex justify-center px-10 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-500 fill-mode-both">
-        <div className="bg-slate-900/60 backdrop-blur-xl border border-white/20 p-6 rounded-[2.5rem] flex items-center gap-10 shadow-2xl max-w-6xl w-full">
-            <div className="flex items-center gap-3 shrink-0">
-                <div className="bg-indigo-600 p-2 rounded-xl text-white">
-                    <Info size={24} />
+  // 全画面ルール案内コンポーネント
+  const RulesOverlay = () => {
+    if (!state.isRulesVisible) return null;
+    
+    return (
+      <div className="fixed inset-0 z-[100] bg-white/90 backdrop-blur-2xl animate-in fade-in duration-500 flex flex-col items-center justify-center p-10 overflow-hidden text-slate-900">
+          <div className="max-w-6xl w-full flex flex-col items-center">
+            <header className="mb-20 text-center animate-in slide-in-from-top-10 duration-700">
+                <div className="flex items-center justify-center gap-6 mb-4">
+                    <div className="bg-indigo-600 p-6 rounded-3xl text-white shadow-2xl">
+                        <ShieldAlert size={64} />
+                    </div>
+                    <h2 className="text-8xl font-black tracking-tighter">QUIZ RULES</h2>
                 </div>
-                <div className="text-left">
-                    <div className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Rule Guide</div>
-                    <div className="text-lg font-black text-white">クイズのルール</div>
+                <p className="text-3xl font-bold text-slate-500 uppercase tracking-[0.4em]">クイズの回答ルール</p>
+            </header>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12 w-full">
+                {/* Rule 1 */}
+                <div className="bg-white p-12 rounded-[3rem] shadow-2xl border border-slate-100 flex flex-col items-center text-center animate-in zoom-in duration-500 delay-100">
+                    <div className="w-40 h-40 rounded-full bg-green-500/10 border-4 border-green-500 flex items-center justify-center text-green-600 mb-8 shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+                        <Sparkles size={80} />
+                    </div>
+                    <h3 className="text-4xl font-black mb-6">スコア</h3>
+                    <p className="text-2xl font-bold text-slate-600 leading-relaxed">
+                        正解すると<br/>
+                        <span className="text-6xl text-slate-900 font-black">10pts</span><br/>
+                        獲得！
+                    </p>
+                </div>
+
+                {/* Rule 2 */}
+                <div className="bg-white p-12 rounded-[3rem] shadow-2xl border border-slate-100 flex flex-col items-center text-center animate-in zoom-in duration-500 delay-300">
+                    <div className="w-40 h-40 rounded-full bg-orange-500/10 border-4 border-orange-500 flex items-center justify-center text-orange-600 mb-8 shadow-[0_0_30px_rgba(249,115,22,0.3)]">
+                        <Zap size={80} />
+                    </div>
+                    <h3 className="text-4xl font-black mb-6">同点時の判定</h3>
+                    <p className="text-2xl font-bold text-slate-600 leading-relaxed">
+                        同じ点数の場合は<br/>
+                        <span className="text-5xl text-slate-900 font-black">回答スピード</span><br/>
+                        で順位が決まる！
+                    </p>
+                </div>
+
+                {/* Rule 3 */}
+                <div className="bg-white p-12 rounded-[3rem] shadow-2xl border border-slate-100 flex flex-col items-center text-center animate-in zoom-in duration-500 delay-500">
+                    <div className="w-40 h-40 rounded-full bg-indigo-500/10 border-4 border-indigo-500 flex items-center justify-center text-indigo-600 mb-8 shadow-[0_0_30px_rgba(99,102,241,0.3)]">
+                        <Smartphone size={80} />
+                    </div>
+                    <h3 className="text-4xl font-black mb-6">回答ボタン</h3>
+                    <p className="text-2xl font-bold text-slate-600 leading-relaxed">
+                        問題が出た後<br/>
+                        <span className="text-5xl text-slate-900 font-black">司会の合図</span><br/>
+                        までボタンは出ません
+                    </p>
                 </div>
             </div>
-            
-            <div className="h-10 w-px bg-white/10 shrink-0"></div>
-            
-            <div className="flex-1 grid grid-cols-3 gap-8">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-green-500/20 border border-green-500/50 flex items-center justify-center text-green-400 shrink-0">
-                        <Sparkles size={20} />
-                    </div>
-                    <div className="text-left">
-                        <div className="text-[10px] font-bold text-slate-400">SCORE</div>
-                        <div className="text-sm font-bold text-white leading-tight">正解で10ポイント獲得</div>
-                    </div>
+
+            <footer className="mt-20 flex flex-col items-center animate-in slide-in-from-bottom-10 duration-700">
+                <div className="bg-slate-100 px-10 py-4 rounded-full flex items-center gap-4 border-2 border-slate-200">
+                    <Info className="text-indigo-600" size={32} />
+                    <p className="text-2xl font-black text-slate-700">準備ができたらニックネームを入力して待機！</p>
                 </div>
-                
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-orange-500/20 border border-orange-500/50 flex items-center justify-center text-orange-400 shrink-0">
-                        <Zap size={20} />
-                    </div>
-                    <div className="text-left">
-                        <div className="text-[10px] font-bold text-slate-400">TIE-BREAKER</div>
-                        <div className="text-sm font-bold text-white leading-tight">同点は回答スピード順</div>
-                    </div>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-500/50 flex items-center justify-center text-blue-400 shrink-0">
-                        <ShieldAlert size={20} />
-                    </div>
-                    <div className="text-left">
-                        <div className="text-[10px] font-bold text-slate-400">CAUTION</div>
-                        <div className="text-sm font-bold text-white leading-tight">合図が出るまでボタンは出ません</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-  );
+            </footer>
+          </div>
+      </div>
+    );
+  };
 
   return (
     <div className="h-full bg-slate-900 text-white flex flex-col font-sans relative overflow-hidden">
       
+      {/* ルール案内オーバーレイ（フルスクリーン） */}
+      <RulesOverlay />
+
       {!isTitleOnlyMode && (
         <header className="bg-slate-800 p-4 flex justify-between items-center shadow-md z-10 shrink-0 h-16">
             <div className="flex items-center gap-4">
@@ -185,9 +207,6 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                             <p className="text-2xl text-slate-400 font-bold uppercase tracking-[0.5em]">Coming Soon</p>
                          </div>
                      )}
-                     
-                     {/* ルール案内のオーバーレイ */}
-                     <RulesOverlay />
                 </div>
             ) : (
                 <div className="w-full h-full flex flex-col items-center justify-start pt-6 p-6">
@@ -385,7 +404,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
                         <div className={`w-1/3 max-w-[320px] flex flex-col justify-end z-10 -mx-2 transition-all duration-1000 delay-300 ${state.isRankingResultVisible && state.rankingRevealStage >= 3 ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-20 scale-95'}`}>
                              <div className="text-center mb-4">
                                 <div className="relative inline-block">
-                                    <Trophy size={64} className="text-yellow-400 absolute -top-16 left-1/2 -translate-x-1/2 animate-bounce-short drop-shadow-[0_0_15px_rgba(250,204,21,0.8)]" />
+                                    <Trophy size={64} className="text-yellow-400 absolute -top-16 left-1/2 -translate-x-1/2 animate-bounce-short drop-shadow-[0_0_15px_rgba(250,204,21,0.5)]" />
                                     <div className="text-4xl md:text-5xl font-black text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] mb-1">{state.isRankingResultVisible ? sortedPlayers[0]?.name : '???'}</div>
                                 </div>
                                 <div className="text-3xl font-mono font-bold text-yellow-100">{state.isRankingResultVisible ? `${sortedPlayers[0]?.score} pts` : ''}</div>
