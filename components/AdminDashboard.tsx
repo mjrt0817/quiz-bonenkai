@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz, convertToDirectLink } from '../services/csvService';
@@ -7,7 +6,8 @@ import {
   RefreshCw, Medal, Trophy, EyeOff, Type, Clock, Lock, Unlock, Music, 
   Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, 
   Terminal, Monitor, Link, Timer, Crown, FastForward, HelpCircle, 
-  CheckCircle2, AlertCircle, BookOpen, Smartphone, FileSpreadsheet, ExternalLink
+  CheckCircle2, AlertCircle, BookOpen, Smartphone, FileSpreadsheet, ExternalLink,
+  Info, Zap, ShieldAlert, ListChecks, Users2
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -87,20 +87,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const validPlayers = players.filter(p => p?.id);
         
         return [...validPlayers].sort((a, b) => {
-            // 主催者は常に最後
             if (a.isOrganizer && !b.isOrganizer) return 1;
             if (!a.isOrganizer && b.isOrganizer) return -1;
-            
-            // スコア降順
             const scoreA = a.score || 0;
             const scoreB = b.score || 0;
             if (scoreB !== scoreA) return scoreB - scoreA;
-            
-            // タイム昇順（短いほうが上）
             const timeA = a.totalResponseTime || 0;
             const timeB = b.totalResponseTime || 0;
             if (timeA !== timeB) return timeA - timeB;
-            
             return (a.name || '').localeCompare(b.name || '');
         });
     } catch (e: any) {
@@ -331,55 +325,133 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <button onClick={onBack} className="text-sm hover:underline text-slate-300">終了する</button>
       </header>
 
+      {/* 拡張版マニュアルモーダル */}
       {isManualOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-4xl h-[85vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+            <div className="bg-white w-full max-w-5xl h-[90vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
                 <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="bg-indigo-600 p-2 rounded-xl"><BookOpen size={24}/></div>
-                        <div><h2 className="text-xl font-black">管理者用操作マニュアル</h2><p className="text-xs text-slate-400">AIクイズ大会システムの運用ガイド</p></div>
+                        <div>
+                            <h2 className="text-xl font-black">AIクイズ大会 完全操作ガイド</h2>
+                            <p className="text-xs text-slate-400">当日の運営フローと役割・注意事項</p>
+                        </div>
                     </div>
                     <button onClick={() => setIsManualOpen(false)} className="p-2 hover:bg-slate-800 rounded-full transition"><X size={24}/></button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-8 space-y-10">
-                    <section className="space-y-4">
-                        <h3 className="text-2xl font-black text-indigo-600 flex items-center gap-2 border-b pb-2"><Monitor size={24}/> 1. 基本構成と役割</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                                <div className="font-bold text-slate-800 mb-1 flex items-center gap-2"><Monitor size={16} className="text-indigo-600"/> プロジェクター用</div>
-                                <p className="text-xs text-slate-500">大型スクリーンに映す「見る専用」の画面です。</p>
+                
+                <div className="flex-1 overflow-y-auto p-8 space-y-12">
+                    {/* ロール別の役割 */}
+                    <section className="space-y-6">
+                        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-2 border-b-4 border-indigo-600 pb-2">
+                            <Users2 size={24} className="text-indigo-600"/> 各ロールの表示と役割
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="bg-indigo-50 p-5 rounded-2xl border-2 border-indigo-200">
+                                <div className="font-bold text-indigo-900 mb-3 flex items-center gap-2"><Monitor size={20}/> プロジェクター (HOST)</div>
+                                <ul className="text-xs text-indigo-800 space-y-2 list-disc list-inside">
+                                    <li>会場全員が見る画面。PCを大型モニタ等に接続。</li>
+                                    <li>操作は不要（Admin画面の操作が自動反映）。</li>
+                                    <li>LobbyではQRコードと参加者リストを表示。</li>
+                                    <li>本番中は「問題」「制限時間」「正解」「ランキング」を表示。</li>
+                                </ul>
                             </div>
-                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                                <div className="font-bold text-slate-800 mb-1 flex items-center gap-2"><Terminal size={16} className="text-red-600"/> 管理者操作用</div>
-                                <p className="text-xs text-slate-500">本画面です。進行、音響、参加者の管理を行います。</p>
+                            <div className="bg-red-50 p-5 rounded-2xl border-2 border-red-200">
+                                <div className="font-bold text-red-900 mb-3 flex items-center gap-2"><Terminal size={20}/> 管理者 (ADMIN)</div>
+                                <ul className="text-xs text-red-800 space-y-2 list-disc list-inside">
+                                    <li><strong>本画面。</strong> 進行担当者が操作するタブレットやPC。</li>
+                                    <li>CSVの読み込み、BGMの設定、問題の切り替え。</li>
+                                    <li>参加者のキック、主催者フラグの切り替え。</li>
+                                    <li>タイマーの開始・正解表示などの全トリガー。</li>
+                                </ul>
                             </div>
-                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                                <div className="font-bold text-slate-800 mb-1 flex items-center gap-2"><Smartphone size={16} className="text-pink-600"/> プレイヤー用</div>
-                                <p className="text-xs text-slate-500">参加者がスマホで回答するための画面です。</p>
+                            <div className="bg-pink-50 p-5 rounded-2xl border-2 border-pink-200">
+                                <div className="font-bold text-pink-900 mb-3 flex items-center gap-2"><Smartphone size={20}/> 参加者 (PLAYER)</div>
+                                <ul className="text-xs text-pink-800 space-y-2 list-disc list-inside">
+                                    <li>参加者の個人のスマホ。QRからブラウザでアクセス。</li>
+                                    <li>タイマー開始までボタンは無効化されます。</li>
+                                    <li>解答ボタン、正解/不正解、個人の暫定順位を表示。</li>
+                                    <li>最終結果発表は「Adminが1位まで表示」するまで隠されます。</li>
+                                </ul>
                             </div>
                         </div>
                     </section>
-                    <section className="space-y-4">
-                        <h3 className="text-2xl font-black text-indigo-600 flex items-center gap-2 border-b pb-2"><RefreshCw size={24}/> 2. クイズの準備 (CSV)</h3>
-                        <div className="space-y-3">
-                            <div className="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 flex flex-col md:flex-row gap-6 items-center">
-                                <div className="flex-1 space-y-2">
-                                    <p className="font-bold text-indigo-900 flex items-center gap-2"><FileSpreadsheet size={20}/> サンプルスプレッドシート</p>
-                                    <p className="text-sm text-indigo-800/80 leading-relaxed">テンプレートをコピーして、ご自身の問題を作成してください。共有設定を「リンクを知っている全員」に変更してURLを貼り付けます。</p>
+
+                    {/* 詳細フロー */}
+                    <section className="space-y-6">
+                        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-2 border-b-4 border-indigo-600 pb-2">
+                            <ListChecks size={24} className="text-indigo-600"/> 運営ステップ・バイ・ステップ
+                        </h3>
+                        <div className="space-y-4">
+                            {[
+                                { step: "1. 準備", desc: "CSV URLを入力し「ロード」をクリック。タイトルや制限時間を設定。効果音ファイルを各スロットにセット。", color: "bg-slate-100" },
+                                { step: "2. ロビー", desc: "プロジェクターにQRを表示して参加を募る。Admin画面で参加者名に不備がないか確認（適宜キック）。", color: "bg-indigo-50" },
+                                { step: "3. クイズ開始", desc: "「クイズ開始」をクリック。プロジェクターに第1問が表示され、Intro音が鳴る。まだ回答はできない。", color: "bg-blue-50" },
+                                { step: "4. 回答開始", desc: "「タイマースタート」をクリック。全員のスマホにボタンが出現し、BGMが流れる。この時点からの秒数が計測される。", color: "bg-orange-50" },
+                                { step: "5. 正解表示", desc: "時間が切れる前、または全員が回答したら「正解を表示」をクリック。BGM停止、正解と解説が表示される。", color: "bg-green-50" },
+                                { step: "6. 次の問題へ", desc: "「次の問題へ」をクリック。全問終わるまで3〜5を繰り返す。", color: "bg-slate-100" },
+                                { step: "7. 結果発表", desc: "最終問題終了後、3位→2位→1位の順に「結果を表示」をクリックして、会場を盛り上げながら発表する。", color: "bg-yellow-50" },
+                            ].map((item, i) => (
+                                <div key={i} className={`p-4 rounded-xl flex gap-4 items-start ${item.color} border border-slate-200`}>
+                                    <div className="bg-slate-900 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0">{i+1}</div>
+                                    <div>
+                                        <div className="font-bold text-slate-900">{item.step}</div>
+                                        <p className="text-sm text-slate-600">{item.desc}</p>
+                                    </div>
                                 </div>
-                                <a href="https://docs.google.com/spreadsheets/d/1RozpHh9965r7qz4RsjWgOSKYfQnsSNkqI0Jua1ElfTs/edit?usp=sharing" target="_blank" rel="noopener noreferrer" className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:bg-indigo-700 transition flex items-center gap-2">テンプレートを開く</a>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* 注意事項 */}
+                    <section className="space-y-6">
+                        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-2 border-b-4 border-red-600 pb-2">
+                            <ShieldAlert size={24} className="text-red-600"/> 重要・注意事項
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-r-xl">
+                                <div className="font-bold text-red-800 flex items-center gap-2 mb-1"><Zap size={16}/> 通信環境について</div>
+                                <p className="text-xs text-red-700">全員がFirebaseを介してリアルタイム通信します。不安定なWi-Fi環境ではラグが生じ、回答ボタンが出ない等のトラブルの原因になります。</p>
                             </div>
-                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                                <p className="text-xs font-bold text-slate-600 mb-2 uppercase tracking-wider">スプレッドシートの列構成:</p>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] font-mono">
-                                    <div className="bg-white p-2 rounded border">A: 問題文</div><div className="bg-white p-2 rounded border">B-E: 選択肢1-4</div><div className="bg-white p-2 rounded border">F-I: 選択肢画像</div><div className="bg-white p-2 rounded border">J: 正解番号(1-4)</div><div className="bg-white p-2 rounded border">K: 解説文</div><div className="bg-white p-2 rounded border">L: 問題用画像</div>
-                                </div>
+                            <div className="p-4 bg-orange-50 border-l-4 border-orange-500 rounded-r-xl">
+                                <div className="font-bold text-orange-800 flex items-center gap-2 mb-1"><Crown size={16}/> 主催者参加モード</div>
+                                <p className="text-xs text-orange-700">運営チームがテスト等で参加する場合、参加者リストの「王冠アイコン」をONにしてください。スコアは記録されますが、最終ランキングでは必ず最下位に回されます。</p>
+                            </div>
+                            <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-xl">
+                                <div className="font-bold text-blue-800 flex items-center gap-2 mb-1"><FileSpreadsheet size={16}/> CSVの形式</div>
+                                <p className="text-xs text-blue-700">スプレッドシートは必ず「リンクを知っている全員」に公開してください。正解番号は 1〜4 で指定します。</p>
+                            </div>
+                            <div className="p-4 bg-purple-50 border-l-4 border-purple-500 rounded-r-xl">
+                                <div className="font-bold text-purple-800 flex items-center gap-2 mb-1"><Music size={16}/> BGMのループ</div>
+                                <p className="text-xs text-purple-700">メインBGMは「Loop」をONにしておくことを推奨します。カウントダウンSEは単発（Loop OFF）の方が終わりが綺麗です。</p>
                             </div>
                         </div>
                     </section>
+
+                    {/* CSVテンプレートリンク */}
+                    <div className="bg-slate-900 p-8 rounded-3xl text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
+                        <div className="space-y-2">
+                            <h4 className="text-xl font-bold flex items-center gap-2"><FileSpreadsheet className="text-green-400"/> スプレッドシート用テンプレート</h4>
+                            <p className="text-sm text-slate-400">コピーしてご利用ください。画像URLはGoogleドライブの共有URLに対応しています。</p>
+                        </div>
+                        <a 
+                            href="https://docs.google.com/spreadsheets/d/1RozpHh9965r7qz4RsjWgOSKYfQnsSNkqI0Jua1ElfTs/edit?usp=sharing" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="bg-white text-slate-900 px-8 py-4 rounded-2xl font-black shadow-lg hover:bg-slate-100 transition flex items-center gap-2"
+                        >
+                            <ExternalLink size={20}/> テンプレートを開く
+                        </a>
+                    </div>
                 </div>
+
                 <div className="p-6 bg-slate-50 border-t flex justify-center shrink-0">
-                    <button onClick={() => setIsManualOpen(false)} className="bg-indigo-600 text-white px-10 py-3 rounded-full font-bold shadow-lg hover:bg-indigo-700 transition flex items-center gap-2"><CheckCircle2 size={20}/> 内容を理解しました</button>
+                    <button 
+                        onClick={() => setIsManualOpen(false)}
+                        className="bg-indigo-600 text-white px-12 py-4 rounded-full font-black shadow-lg hover:bg-indigo-700 active:scale-95 transition flex items-center gap-3"
+                    >
+                        <CheckCircle2 size={24}/> 内容をすべて理解しました
+                    </button>
                 </div>
             </div>
         </div>
@@ -441,6 +513,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="lg:col-span-2 flex flex-col gap-6">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200">
                <div className="p-4 border-b border-slate-200 flex items-center gap-2"><Music size={20} className="text-indigo-600"/><h2 className="font-bold text-lg text-slate-700">効果音 / BGM</h2></div>
+               <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col gap-4">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500">問題表示時SE</label>
+                            <input type="file" accept="audio/*" onChange={handleIntroSoundSelect} className="text-xs block w-full border rounded p-1 bg-white" />
+                        </div>
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <label className="text-xs font-bold text-slate-500">メインBGM (〜残り6秒)</label>
+                                <button onClick={toggleMainThinkingLoop} className={`px-2 py-0.5 rounded text-[10px] ${isMainThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200'}`}>Loop: {isMainThinkingLoop ? 'ON' : 'OFF'}</button>
+                            </div>
+                            <input type="file" accept="audio/*" onChange={handleMainThinkingSoundSelect} className="text-xs block w-full border rounded p-1 bg-white" />
+                        </div>
+                   </div>
+                   <div className="space-y-2 border-t pt-2">
+                       <div className="flex justify-between items-center">
+                            <label className="text-xs font-bold text-slate-500">カウントダウンBGM (残り6秒〜)</label>
+                            <button onClick={toggleThinkingLoop} className={`px-2 py-0.5 rounded text-[10px] ${isThinkingLoop ? 'bg-indigo-600 text-white' : 'bg-slate-200'}`}>Loop: {isThinkingLoop ? 'ON' : 'OFF'}</button>
+                       </div>
+                       <input type="file" accept="audio/*" onChange={handleThinkingSoundSelect} className="text-xs block w-full border rounded p-1 bg-white" />
+                   </div>
+               </div>
                <div className="p-4 grid grid-cols-2 md:grid-cols-6 gap-3">
                   {soundSlots.map((slot, index) => (
                     <div key={slot.id} className={`border rounded-lg p-2 flex flex-col gap-2 ${slot.isPlaying ? 'border-green-400 bg-green-50' : 'bg-slate-50'}`}>
