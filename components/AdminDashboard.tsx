@@ -7,7 +7,7 @@ import {
   Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, 
   Terminal, Monitor, Link, Timer, Crown, FastForward, HelpCircle, 
   CheckCircle2, AlertCircle, BookOpen, Smartphone, FileSpreadsheet, ExternalLink,
-  Info, Zap, ShieldAlert, ListChecks, Users2, Megaphone
+  Info, Zap, ShieldAlert, ListChecks, Users2, Megaphone, Mic2, MessageSquare
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -368,7 +368,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <div className="bg-pink-50 p-5 rounded-2xl border-2 border-pink-200">
                                 <div className="font-bold text-pink-900 mb-3 flex items-center gap-2"><Smartphone size={20}/> 参加者 (PLAYER)</div>
                                 <ul className="text-xs text-pink-800 space-y-2 list-disc list-inside">
-                                    <li>参加者の個人のスマホ。QRからブラウザでアクセス。</li>
+                                    <li>参加者の個人のスマホ。QRコードからブラウザでアクセス。</li>
                                     <li>タイマー開始までボタンは無効化されます。</li>
                                     <li>解答ボタン、正解/不正解、個人の暫定順位を表示。</li>
                                     <li>最終結果発表は「Adminが1位まで表示」するまで隠されます。</li>
@@ -493,6 +493,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       <main className="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* 左側カラム：設定・進行 */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 text-center">
              <p className="text-xs text-slate-500 mb-2">プレイヤー参加用URL</p>
@@ -550,7 +551,53 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           )}
         </div>
 
+        {/* 右側カラム：アナウンス・音響・リスト */}
         <div className="lg:col-span-2 flex flex-col gap-6">
+            
+            {/* 司会用アナウンス（カンペ）パネル */}
+            <div className="bg-pink-50 rounded-xl shadow-sm border border-pink-200 overflow-hidden">
+                <div className="p-4 bg-pink-600 text-white flex justify-between items-center">
+                    <div className="flex items-center gap-2 font-black">
+                        <Mic2 size={20}/>
+                        <span>司会用プロンプター (カンペ)</span>
+                    </div>
+                    <Megaphone size={20} className="opacity-50"/>
+                </div>
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-3">
+                        <div className="flex items-start gap-2">
+                            <div className="bg-pink-200 text-pink-700 p-1 rounded mt-0.5"><Users2 size={14}/></div>
+                            <div>
+                                <p className="text-xs font-bold text-pink-800">参加案内</p>
+                                <p className="text-[11px] text-pink-600 leading-tight">「スクリーン上のQRを読み込んでください。ニックネームを入れて開始まで待機してください。」</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                            <div className="bg-pink-200 text-pink-700 p-1 rounded mt-0.5"><ShieldAlert size={14}/></div>
+                            <div>
+                                <p className="text-xs font-bold text-pink-800">接続の注意</p>
+                                <p className="text-[11px] text-pink-600 leading-tight">「一度参加したら、ブラウザの『戻る』や『更新』は押さないでくださいね。」</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="space-y-3">
+                        <div className="flex items-start gap-2">
+                            <div className="bg-pink-200 text-pink-700 p-1 rounded mt-0.5"><Zap size={14}/></div>
+                            <div>
+                                <p className="text-xs font-bold text-pink-800">回答ルール</p>
+                                <p className="text-[11px] text-pink-600 leading-tight">「同点の場合は回答スピードが勝負です！合図のあと、迷わずボタンを押しましょう。」</p>
+                            </div>
+                        </div>
+                        <div className="bg-white border border-pink-100 p-2 rounded-lg flex items-start gap-2">
+                            <MessageSquare size={14} className="text-pink-400 mt-1 shrink-0"/>
+                            <p className="text-[11px] italic font-medium text-pink-700 leading-relaxed">
+                                「それでは準備はいいですか？ 第1問、スタート！」
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="bg-white rounded-xl shadow-sm border border-slate-200">
                <div className="p-4 border-b border-slate-200 flex items-center gap-2"><Music size={20} className="text-indigo-600"/><h2 className="font-bold text-lg text-slate-700">効果音 / BGM</h2></div>
                <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col gap-4">
