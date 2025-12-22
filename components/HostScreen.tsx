@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, BTN_LABELS, COLORS } from '../types';
 // Added Smartphone to the imports from lucide-react to fix the "Cannot find name 'Smartphone'" error
@@ -85,16 +84,16 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
     if (!state.isRulesVisible) return null;
     
     return (
-      <div className="fixed inset-0 z-[100] bg-white/90 backdrop-blur-2xl animate-in fade-in duration-500 flex flex-col items-center justify-center p-10 overflow-hidden text-slate-900">
+      <div className="fixed inset-0 z-[100] bg-white/65 backdrop-blur-2xl animate-in fade-in duration-500 flex flex-col items-center justify-center p-10 overflow-hidden text-slate-900">
           <div className="max-w-6xl w-full flex flex-col items-center">
             <header className="mb-20 text-center animate-in slide-in-from-top-10 duration-700">
                 <div className="flex items-center justify-center gap-6 mb-4">
                     <div className="bg-indigo-600 p-6 rounded-3xl text-white shadow-2xl">
                         <ShieldAlert size={64} />
                     </div>
-                    <h2 className="text-8xl font-black tracking-tighter">QUIZ RULES</h2>
+                    <h2 className="text-8xl font-black tracking-tighter drop-shadow-sm">QUIZ RULES</h2>
                 </div>
-                <p className="text-3xl font-bold text-slate-500 uppercase tracking-[0.4em]">クイズの回答ルール</p>
+                <p className="text-3xl font-bold text-slate-600 uppercase tracking-[0.4em] drop-shadow-sm">クイズの回答ルール</p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-12 w-full">
@@ -139,7 +138,7 @@ const HostScreen: React.FC<HostScreenProps> = ({ state, onBack }) => {
             </div>
 
             <footer className="mt-20 flex flex-col items-center animate-in slide-in-from-bottom-10 duration-700">
-                <div className="bg-slate-100 px-10 py-4 rounded-full flex items-center gap-4 border-2 border-slate-200">
+                <div className="bg-white/80 backdrop-blur-md px-10 py-4 rounded-full flex items-center gap-4 border-2 border-indigo-100 shadow-lg">
                     <Info className="text-indigo-600" size={32} />
                     <p className="text-2xl font-black text-slate-700">準備ができたらニックネームを入力して待機！</p>
                 </div>
