@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { db } from '../services/firebaseConfig';
@@ -20,6 +19,7 @@ const INITIAL_HOST_STATE: HostState = {
   quizTitle: 'クイズ大会',
   titleImage: null,
   isLobbyDetailsVisible: false,
+  isRulesVisible: false,
 };
 
 export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
