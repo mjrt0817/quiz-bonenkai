@@ -7,7 +7,7 @@ import {
   Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, 
   Terminal, Monitor, Link, Timer, Crown, FastForward, HelpCircle, 
   CheckCircle2, AlertCircle, BookOpen, Smartphone, FileSpreadsheet, ExternalLink,
-  Info, Zap, ShieldAlert, ListChecks, Users2
+  Info, Zap, ShieldAlert, ListChecks, Users2, Megaphone
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -325,7 +325,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <button onClick={onBack} className="text-sm hover:underline text-slate-300">終了する</button>
       </header>
 
-      {/* 拡張版マニュアルモーダル */}
       {isManualOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white w-full max-w-5xl h-[90vh] rounded-3xl overflow-hidden flex flex-col shadow-2xl">
@@ -373,6 +372,41 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     <li>解答ボタン、正解/不正解、個人の暫定順位を表示。</li>
                                     <li>最終結果発表は「Adminが1位まで表示」するまで隠されます。</li>
                                 </ul>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 参加者へのアナウンス事項 */}
+                    <section className="space-y-6">
+                        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-2 border-b-4 border-pink-500 pb-2">
+                            <Megaphone size={24} className="text-pink-500"/> 参加者への説明・アナウンス事項
+                        </h3>
+                        <div className="bg-pink-50 rounded-3xl p-6 border border-pink-100 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-3">
+                                    <h4 className="font-black text-pink-900 flex items-center gap-2"><CheckCircle2 size={18} className="text-pink-600"/> 参加時の案内</h4>
+                                    <ul className="text-xs text-pink-800 space-y-2 list-inside list-disc">
+                                        <li>「スクリーン上のQRコードを読み取ってください」</li>
+                                        <li>「好きなニックネームを入力して、開始までお待ちください」</li>
+                                        <li>「一度参加した後は、ブラウザの『戻る』や『更新』は押さないでください」</li>
+                                        <li>「万が一画面が真っ白になったら、再度読み込んで同じ名前で入り直してください」</li>
+                                    </ul>
+                                </div>
+                                <div className="space-y-3">
+                                    <h4 className="font-black text-pink-900 flex items-center gap-2"><CheckCircle2 size={18} className="text-pink-600"/> 回答ルールの案内</h4>
+                                    <ul className="text-xs text-pink-800 space-y-2 list-inside list-disc">
+                                        <li>「問題が表示された後、管理者が合図（タイマースタート）するまでボタンは出ません」</li>
+                                        <li>「正解すると10ポイント加算されます」</li>
+                                        <li>「同点の場合は、**回答が早かった人**が上位になります。スピード重視です！」</li>
+                                        <li>「一度回答ボタンを押すと、その問題の回答は変更できません」</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div className="p-4 bg-white rounded-2xl border border-pink-200 shadow-sm">
+                                <p className="text-xs font-bold text-pink-900 mb-2 italic">司会者用カンペ例：</p>
+                                <p className="text-sm text-pink-700 leading-relaxed font-medium">
+                                    「皆さん、準備はいいですか？ 同点の場合は回答速度が順位を左右します！ 問題をよく読んで、これだ！と思ったら迷わずボタンを押してくださいね。それでは、第1問、スタート！」
+                                </p>
                             </div>
                         </div>
                     </section>
