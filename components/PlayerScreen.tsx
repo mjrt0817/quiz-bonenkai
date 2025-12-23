@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, Player, BTN_LABELS, COLORS } from '../types';
 import { User, Loader, Check, X, Trophy, LogOut, AlertTriangle, Sparkles, Lock, Medal, PartyPopper } from 'lucide-react';
@@ -280,7 +281,6 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
   // --- 5. FINAL RESULT ---
   if (state.gameState === GameState.FINAL_RESULT) {
      const sortedPlayers = [...state.players].sort((a, b) => {
-         // Sort logic same as Host: Organizers last
          if (a.isOrganizer && !b.isOrganizer) return 1;
          if (!a.isOrganizer && b.isOrganizer) return -1;
 
@@ -297,20 +297,24 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
      // Determine if I should see the result
      let showMyResult = false;
      if (isOrganizer) {
-         showMyResult = true; // Organizers see their result (last place) immediately
+         showMyResult = true; // Organizers see their result immediately
+     } else if (myRank > 3) {
+         showMyResult = true; // 4th place and below see results immediately
      } else {
-        if (myRank > 3) {
-            showMyResult = true;
-        } else if (myRank === 3 && state.rankingRevealStage >= 1) {
-            showMyResult = true;
-        } else if (myRank === 2 && state.rankingRevealStage >= 2) {
-            showMyResult = true;
-        } else if (myRank === 1 && state.rankingRevealStage >= 3) {
-            showMyResult = true;
-        }
+         // Top 3 logic: wait for host to reveal the stage AND visible flag
+         // rank 3 (3位) -> state.rankingRevealStage === 1
+         // rank 2 (2位) -> state.rankingRevealStage === 2
+         // rank 1 (1位) -> state.rankingRevealStage === 3
+         if (myRank === 3) {
+             showMyResult = (state.rankingRevealStage === 1 && state.isRankingResultVisible) || state.rankingRevealStage > 1;
+         } else if (myRank === 2) {
+             showMyResult = (state.rankingRevealStage === 2 && state.isRankingResultVisible) || state.rankingRevealStage > 2;
+         } else if (myRank === 1) {
+             showMyResult = (state.rankingRevealStage === 3 && state.isRankingResultVisible);
+         }
      }
 
-     if (state.hideBelowTop3 && myRank > 3) {
+     if (state.hideBelowTop3 && myRank > 3 && !isOrganizer) {
          return (
              <div className="h-full bg-slate-900 flex flex-col items-center justify-center p-8 text-white text-center relative">
                  <div className="z-10 flex flex-col items-center">
@@ -320,7 +324,6 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
                      <h2 className="text-3xl font-black mb-4 text-white">THANK YOU!</h2>
                      <p className="text-lg text-indigo-200 mb-8">ご参加ありがとうございました！<br/>クイズ大会は終了です。</p>
                      <div className="text-3xl font-mono font-bold text-indigo-400 mb-2">{currentPlayer?.score} pts</div>
-                     {isOrganizer && <p className="text-yellow-500 text-sm mt-2">(主催者枠)</p>}
                      <button onClick={onBack} className="mt-8 flex items-center gap-2 text-slate-500 hover:text-white transition">
                         <LogOut size={16} /> Exit
                     </button>
