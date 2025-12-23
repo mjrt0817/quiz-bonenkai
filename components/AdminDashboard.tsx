@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { GameState, HostState, Player } from '../types';
 import { parseCSVQuiz, convertToDirectLink } from '../services/csvService';
@@ -8,7 +7,8 @@ import {
   Upload, Volume2, Pause, Repeat, Image as ImageIcon, X, QrCode, 
   Terminal, Monitor, Link, Timer, Crown, FastForward, HelpCircle, 
   CheckCircle2, AlertCircle, BookOpen, Smartphone, FileSpreadsheet, ExternalLink,
-  Info, Zap, ShieldAlert, ListChecks, Users2, Megaphone, Mic2, MessageSquare, AlertTriangle
+  Info, Zap, ShieldAlert, ListChecks, Users2, Megaphone, Mic2, MessageSquare, AlertTriangle,
+  LayoutGrid
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -618,7 +618,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <div className="bg-white border border-pink-100 p-2 rounded-lg flex items-start gap-2">
                             <MessageSquare size={14} className="text-pink-400 mt-1 shrink-0"/>
                             <p className="text-[11px] italic font-medium text-pink-700 leading-relaxed">
-                                「それでは準備はいいですか？ 第1問、スタート！」
+                                「それでは準備はいいですか？ 第1問, スタート！」
                             </p>
                         </div>
                     </div>
@@ -699,10 +699,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </tbody>
                         </table>
                     ) : (
-                        <div className="p-4 space-y-2">
-                            {state.questions.map((q, i) => (
-                                <div key={i} className="text-xs border-b pb-1"><span className="text-slate-400 mr-2">{i+1}.</span><span className="font-bold">{q.text}</span><span className="text-green-600 ml-2">({q.options[q.correctIndex]})</span></div>
-                            ))}
+                        <div className="p-4 space-y-3">
+                            {state.questions.map((q, i) => {
+                                const hasQuestionImage = !!q.questionImage;
+                                const hasOptionImages = Array.isArray(q.optionImages) && q.optionImages.some(img => !!img);
+
+                                return (
+                                    <div key={i} className="flex flex-col gap-1 border-b pb-2 last:border-0">
+                                        <div className="flex items-start gap-2">
+                                            <span className="text-slate-400 font-mono text-[10px] mt-0.5">{i+1}.</span>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                                                    {hasQuestionImage && (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 text-[9px] font-bold" title="設問に画像あり">
+                                                            <ImageIcon size={10}/> 設問画像
+                                                        </span>
+                                                    )}
+                                                    {hasOptionImages && (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-50 text-green-600 border border-green-100 text-[9px] font-bold" title="選択肢に画像あり">
+                                                            <LayoutGrid size={10}/> 選択肢画像
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs font-bold text-slate-800 break-words leading-relaxed">{q.text}</p>
+                                                <div className="mt-1 flex items-center gap-2">
+                                                    <span className="text-[10px] text-slate-400">正解:</span>
+                                                    <span className="text-[10px] font-bold text-green-600 bg-green-50 px-1.5 rounded border border-green-100">
+                                                        {q.options[q.correctIndex]}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
