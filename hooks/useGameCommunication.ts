@@ -180,5 +180,13 @@ export const useGameCommunication = (role: 'HOST' | 'PLAYER' | 'ADMIN') => {
     });
   }, [role, playerId]);
 
-  return { hostState, playerId, joinError, updateHostState, joinGame, submitAnswer, resetPlayerAnswers, resetPlayerScores, calculateAndSaveScores, kickPlayer, resetAllPlayers, toggleOrganizer };
+  // ローカルストレージとステートをクリアして、新しいIDでの参加を可能にする
+  const logout = useCallback(() => {
+    if (role !== 'PLAYER') return;
+    localStorage.removeItem('quiz_player_id');
+    localStorage.removeItem('quiz_player_name');
+    setPlayerId('');
+  }, [role]);
+
+  return { hostState, playerId, joinError, updateHostState, joinGame, submitAnswer, resetPlayerAnswers, resetPlayerScores, calculateAndSaveScores, kickPlayer, resetAllPlayers, toggleOrganizer, logout };
 };
