@@ -1,4 +1,3 @@
-
 import React, { ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -12,10 +11,7 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Added explicit state declaration to fix TypeScript errors regarding property existence
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public state: ErrorBoundaryState;
-
   constructor(props: ErrorBoundaryProps) {
     super(props);
     // Initialize state
