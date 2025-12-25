@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useGameCommunication } from './hooks/useGameCommunication';
 import HostScreen from './components/HostScreen';
@@ -144,7 +145,7 @@ const AdminApp: React.FC<{onBack: () => void}> = ({ onBack }) => {
 };
 
 const PlayerApp: React.FC<{onBack: () => void}> = ({ onBack }) => {
-  const { hostState, playerId, joinGame, submitAnswer } = useGameCommunication('PLAYER');
+  const { hostState, playerId, joinGame, submitAnswer, logout } = useGameCommunication('PLAYER');
   return (
     <PlayerScreen 
       state={hostState} 
@@ -152,6 +153,7 @@ const PlayerApp: React.FC<{onBack: () => void}> = ({ onBack }) => {
       onJoin={joinGame} 
       onAnswer={submitAnswer} 
       onBack={onBack}
+      onLogout={logout}
     />
   );
 };
