@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { GameState, HostState, Player, BTN_LABELS, COLORS } from '../types';
-import { User, Loader, Check, X, Trophy, LogOut, AlertTriangle, Sparkles, Lock, Medal, PartyPopper } from 'lucide-react';
+import { User, Loader, Check, X, Trophy, LogOut, AlertTriangle, Sparkles, Lock, Medal, PartyPopper, RefreshCw } from 'lucide-react';
 
 interface PlayerScreenProps {
   state: HostState;
@@ -9,11 +9,12 @@ interface PlayerScreenProps {
   onJoin: (name: string) => Promise<boolean>;
   onAnswer: (index: number) => void;
   onBack: () => void;
+  onLogout: () => void;
 }
 
 const STORAGE_KEY = 'quiz_player_name';
 
-const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, onAnswer, onBack }) => {
+const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, onAnswer, onBack, onLogout }) => {
   const [nameInput, setNameInput] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [joined, setJoined] = useState(false);
@@ -60,6 +61,16 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
       }
       setIsJoining(false);
     }
+  };
+
+  const handleLogout = () => {
+      if(confirm('現在のアカウント情報をクリアして、新規ユーザーとして入り直しますか？')) {
+          onLogout();
+          setJoined(false);
+          setNameInput('');
+          // Local storage name is already cleared in hook, but ensure state is clean
+          setIsJoining(false);
+      }
   };
 
   useEffect(() => {
@@ -122,6 +133,11 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
               {isJoining ? <Loader className="animate-spin" size={20} /> : '参加する'}
             </button>
           </form>
+          <div className="mt-6 text-center">
+              <button onClick={handleLogout} className="text-xs text-slate-400 hover:text-slate-600 underline flex items-center justify-center w-full gap-1">
+                  <RefreshCw size={12}/> セッション情報をリセット
+              </button>
+          </div>
         </div>
       </div>
     );
@@ -142,6 +158,12 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ state, playerId, onJoin, on
                  ※ あなたは主催者モードです（ランキング対象外）
              </div>
          )}
+         
+         <div className="absolute bottom-10 left-0 right-0 flex justify-center">
+            <button onClick={handleLogout} className="text-sm text-indigo-200 hover:text-white underline flex items-center gap-2 bg-indigo-600/50 px-4 py-2 rounded-lg hover:bg-indigo-600 transition">
+                <LogOut size={16} /> 別のアカウントで入り直す
+            </button>
+         </div>
       </div>
     );
   }
